@@ -1,10 +1,13 @@
+#include <algorithm>
 #include <atomic>
+#include <chrono>
 #include <cmath>
 #include <condition_variable>
 #include <deque>
 #include <functional>
 #include <iostream>
 #include <mutex>
+#include <numeric>
 #include <thread>
 #include <vector>
 
@@ -57,23 +60,19 @@ void Dummy_task(int id)
     g_sum.fetch_add((double)val, std::memory_order_relaxed);
 }
 
-int main()
+void RunTasks()
 {
     std::vector<std::thread> workers;
 
-    for (int i = 0; i < 10; i++) {
-        workers.push_back(std::thread(Worker));
+    int num_threads = std::thread::hardware_concurrency();
+    for (int i = 0; i < num_threads; i++) {
+        workers.emplace_back(Worker);
     }
 
-    auto start = std::chrono::high_resolution_clock::now();
-
     for (int i = 0; i < 10; i++) {
-        {
-            std::lock_guard<std::mutex> lock(m);
-            for (int j = 0; j < 100; j++) {
-                g_tasks.push_back([i] { Dummy_task(i); });
-                g_pending_tasks.fetch_add(1, std::memory_order_acq_rel);
-            }
+        for (int j = 0; j < 100; j++) {
+            g_tasks.push_back([i] { Dummy_task(i); });
+            g_pending_tasks.fetch_add(1, std::memory_order_acq_rel);
         }
     }
 
@@ -81,17 +80,49 @@ int main()
         std::unique_lock<std::mutex> lock(m);
         g_task_done.wait(lock, [] { return g_pending_tasks.load(std::memory_order_acquire) == 0; });
     }
+
     g_stop = true;
     for (auto& t : workers) {
         t.join();
     }
+}
 
-    std::cout << "Result: " << g_sum << std::endl;
+int main()
+{
+    std::cout << std::fixed << std::setprecision(3);
 
-    auto end = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double, std::milli> diff = end - start;
+    int iterations = 11; // 워밍업 1회 + 측정 10회
+    std::vector<double> results;
 
-    std::cout << "Elapsed Time: " << diff.count() << "ms" << std::endl;
+    for (int i = 0; i < iterations; i++) {
+        g_sum = 0.0;
+        g_pending_tasks = 0;
+        g_stop = false;
 
-    return 0;
+        {
+            std::lock_guard<std::mutex> lock(m);
+            g_tasks.clear();
+        }
+
+        auto start = std::chrono::high_resolution_clock::now();
+        RunTasks();
+        auto end = std::chrono::high_resolution_clock::now();
+
+        std::chrono::duration<double, std::milli> elapsed = end - start;
+        if (i == 0) {
+            std::cout << "Warm-up: " << elapsed.count() << "ms (Discarded) ";
+        } else {
+            results.push_back(elapsed.count());
+            std::cout << "Iteration " << i << ": " << elapsed.count() << "ms ";
+        }
+
+        std::cout << "Sum: " << g_sum.load(std::memory_order_relaxed) << std::endl;
+    }
+
+    double avg = std::accumulate(results.begin(), results.end(), 0.0) / results.size();
+    double min_val = *std::min_element(results.begin(), results.end());
+
+    std::cout << "\n=== Final Benchmark Result ===" << std::endl;
+    std::cout << "Average: " << avg << "ms" << std::endl;
+    std::cout << "Minimum: " << min_val << "ms" << std::endl;
 }
