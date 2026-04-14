@@ -1,4 +1,5 @@
 #include <atomic>
+#include <cmath>
 #include <condition_variable>
 #include <deque>
 #include <functional>
@@ -17,7 +18,7 @@ std::condition_variable g_task_done; // 작업 완료 신호
 
 std::atomic<bool> g_stop = false; // 작업 종료 신호
 
-std::atomic<int> g_sum = 0; // 작업 결과
+std::atomic<double> g_sum = 0; // 작업 결과
 
 void Worker()
 {
@@ -45,11 +46,15 @@ void Worker()
     }
 }
 
-void Add()
+void Dummy_task(int id)
 {
-    for (int i = 0; i < 100000; i++) {
-        g_sum++;
+    double val = id;
+    int count = (id + 1) * 100000;
+    for (int i = 0; i < count; i++) {
+        val = std::sin(val + i) + std::cos(val - i);
     }
+
+    g_sum.fetch_add((double)val, std::memory_order_relaxed);
 }
 
 int main()
@@ -65,8 +70,10 @@ int main()
     for (int i = 0; i < 10; i++) {
         {
             std::lock_guard<std::mutex> lock(m);
-            g_tasks.push_back(Add);
-            g_pending_tasks.fetch_add(1, std::memory_order_acq_rel);
+            for (int j = 0; j < 100; j++) {
+                g_tasks.push_back([i] { Dummy_task(i); });
+                g_pending_tasks.fetch_add(1, std::memory_order_acq_rel);
+            }
         }
     }
 
