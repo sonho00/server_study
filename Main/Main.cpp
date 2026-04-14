@@ -1,13 +1,17 @@
 #include <iostream>
+#include <mutex>
 #include <thread>
 #include <vector>
 
 int g_sum = 0;
+std::mutex m;
 
 void Add()
 {
     for (int i = 0; i < 100000; i++) {
+        m.lock();
         g_sum++;
+        m.unlock();
     }
 }
 
