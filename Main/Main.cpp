@@ -9,9 +9,8 @@ std::mutex m;
 void Add()
 {
     for (int i = 0; i < 100000; i++) {
-        m.lock();
+        std::lock_guard<std::mutex> lock(m);
         g_sum++;
-        m.unlock();
     }
 }
 
