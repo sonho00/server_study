@@ -13,7 +13,34 @@
 
 using Task = std::function<void()>;
 
-std::deque<Task> g_tasks; // 중앙 공유 큐
+struct WorkerQueue {
+    std::deque<Task> tasks;
+    std::mutex mtx;
+
+    void push(Task task)
+    {
+        std::lock_guard<std::mutex> lock(mtx);
+        tasks.push_back(std::move(task));
+    }
+
+    bool try_pop(Task& task)
+    {
+        std::lock_guard<std::mutex> lock(mtx);
+        if (tasks.empty())
+            return false;
+        task = std::move(tasks.front());
+        tasks.pop_front();
+        return true;
+    }
+
+    bool empty()
+    {
+        std::lock_guard<std::mutex> lock(mtx);
+        return tasks.empty();
+    }
+};
+
+std::vector<std::unique_ptr<WorkerQueue>> g_local_queues;
 std::mutex m;
 
 std::atomic<int> g_pending_tasks = 0; // 대기 중인 작업 수
@@ -23,20 +50,12 @@ std::atomic<bool> g_stop = false; // 작업 종료 신호
 
 std::atomic<double> g_sum = 0; // 작업 결과
 
-void Worker()
+void Worker(int id)
 {
+    auto& my_q = *g_local_queues[id];
     while (true) {
         Task task = nullptr;
-
-        {
-            std::lock_guard<std::mutex> lock(m);
-            if (!g_tasks.empty()) {
-                task = std::move(g_tasks.front());
-                g_tasks.pop_front();
-            }
-        }
-
-        if (task) {
+        if (my_q.try_pop(task)) {
             task();
             if (g_pending_tasks.fetch_sub(1, std::memory_order_acq_rel) == 1) {
                 g_task_done.notify_one();
@@ -65,13 +84,15 @@ void RunTasks()
     std::vector<std::thread> workers;
 
     int num_threads = std::thread::hardware_concurrency();
+    g_local_queues.resize(num_threads);
     for (int i = 0; i < num_threads; i++) {
-        workers.emplace_back(Worker);
+        g_local_queues[i] = std::make_unique<WorkerQueue>();
+        workers.emplace_back(Worker, i);
     }
 
     for (int i = 0; i < 10; i++) {
         for (int j = 0; j < 100; j++) {
-            g_tasks.push_back([i] { Dummy_task(i); });
+            g_local_queues[j % num_threads]->push([i] { Dummy_task(i); });
             g_pending_tasks.fetch_add(1, std::memory_order_acq_rel);
         }
     }
@@ -98,11 +119,7 @@ int main()
         g_sum = 0.0;
         g_pending_tasks = 0;
         g_stop = false;
-
-        {
-            std::lock_guard<std::mutex> lock(m);
-            g_tasks.clear();
-        }
+        g_local_queues.clear();
 
         auto start = std::chrono::high_resolution_clock::now();
         RunTasks();
