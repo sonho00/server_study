@@ -1,0 +1,14 @@
+# Executables
+*.exe
+*.out
+
+# Objects and Libraries
+*.o
+*.obj
+*.lib
+*.dll
+
+# IDE (VS Code, Visual Studio)
+.vscode/
+bin/
+obj/
