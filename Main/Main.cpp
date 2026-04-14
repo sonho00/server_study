@@ -60,6 +60,8 @@ int main()
         workers.push_back(std::thread(Worker));
     }
 
+    auto start = std::chrono::high_resolution_clock::now();
+
     for (int i = 0; i < 10; i++) {
         {
             std::lock_guard<std::mutex> lock(m);
@@ -78,6 +80,11 @@ int main()
     }
 
     std::cout << "Result: " << g_sum << std::endl;
+
+    auto end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double, std::milli> diff = end - start;
+
+    std::cout << "Elapsed Time: " << diff.count() << "ms" << std::endl;
 
     return 0;
 }
