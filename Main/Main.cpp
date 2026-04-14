@@ -1,15 +1,13 @@
+#include <atomic>
 #include <iostream>
-#include <mutex>
 #include <thread>
 #include <vector>
 
-int g_sum = 0;
-std::mutex m;
+std::atomic<int> g_sum = 0;
 
 void Add()
 {
     for (int i = 0; i < 100000; i++) {
-        std::lock_guard<std::mutex> lock(m);
         g_sum++;
     }
 }
