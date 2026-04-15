@@ -8,6 +8,7 @@
 #include <iostream>
 #include <mutex>
 #include <numeric>
+#include <random>
 #include <thread>
 #include <vector>
 
@@ -28,20 +29,24 @@ struct WorkerQueue {
         std::lock_guard<std::mutex> lock(mtx);
         if (tasks.empty())
             return false;
+        task = std::move(tasks.back());
+        tasks.pop_back();
+        return true;
+    }
+
+    bool try_steal(Task& task)
+    {
+        std::lock_guard<std::mutex> lock(mtx);
+        if (tasks.empty())
+            return false;
         task = std::move(tasks.front());
         tasks.pop_front();
         return true;
     }
-
-    bool empty()
-    {
-        std::lock_guard<std::mutex> lock(mtx);
-        return tasks.empty();
-    }
 };
 
 std::vector<std::unique_ptr<WorkerQueue>> g_local_queues;
-std::mutex m;
+std::mutex g_m;
 
 std::atomic<int> g_pending_tasks = 0; // 대기 중인 작업 수
 std::condition_variable g_task_done; // 작업 완료 신호
@@ -52,6 +57,9 @@ std::atomic<double> g_sum = 0; // 작업 결과
 
 void Worker(int id)
 {
+    static thread_local std::mt19937 gen(std::random_device { }());
+    std::uniform_int_distribution<int> dis(0, g_local_queues.size() - 1);
+
     auto& my_q = *g_local_queues[id];
     while (true) {
         Task task = nullptr;
@@ -61,9 +69,24 @@ void Worker(int id)
                 g_task_done.notify_one();
             }
         } else {
-            if (g_stop)
-                break;
-            std::this_thread::yield();
+            bool stolen = false;
+            for (int i = 0; i < g_local_queues.size(); i++) {
+                int victim_id = dis(gen);
+                if (victim_id == id)
+                    continue;
+
+                if (g_local_queues[victim_id]->try_steal(task)) {
+                    stolen = true;
+                    my_q.push(std::move(task));
+                    break;
+                }
+            }
+
+            if (!stolen) {
+                if (g_stop)
+                    break;
+                std::this_thread::yield();
+            }
         }
     }
 }
@@ -84,9 +107,8 @@ void RunTasks()
     std::vector<std::thread> workers;
 
     int num_threads = std::thread::hardware_concurrency();
-    g_local_queues.resize(num_threads);
     for (int i = 0; i < num_threads; i++) {
-        g_local_queues[i] = std::make_unique<WorkerQueue>();
+        g_local_queues.push_back(std::make_unique<WorkerQueue>());
         workers.emplace_back(Worker, i);
     }
 
@@ -98,7 +120,7 @@ void RunTasks()
     }
 
     {
-        std::unique_lock<std::mutex> lock(m);
+        std::unique_lock<std::mutex> lock(g_m);
         g_task_done.wait(lock, [] { return g_pending_tasks.load(std::memory_order_acquire) == 0; });
     }
 
