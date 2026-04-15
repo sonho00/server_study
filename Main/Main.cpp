@@ -15,32 +15,36 @@
 using Task = std::function<void()>;
 
 struct WorkerQueue {
-    std::deque<Task> tasks;
+    static constexpr size_t CAPACITY = 1024;
+    Task tasks[CAPACITY];
+    std::atomic<size_t> head { 0 };
+    std::atomic<size_t> tail { 0 };
     std::mutex mtx;
 
     void push(Task task)
     {
         std::lock_guard<std::mutex> lock(mtx);
-        tasks.push_back(std::move(task));
+        tasks[tail % CAPACITY] = std::move(task);
+        tail++;
     }
 
     bool try_pop(Task& task)
     {
         std::lock_guard<std::mutex> lock(mtx);
-        if (tasks.empty())
+        if (head == tail)
             return false;
-        task = std::move(tasks.back());
-        tasks.pop_back();
+        tail--;
+        task = std::move(tasks[tail % CAPACITY]);
         return true;
     }
 
     bool try_steal(Task& task)
     {
         std::lock_guard<std::mutex> lock(mtx);
-        if (tasks.empty())
+        if (head == tail)
             return false;
-        task = std::move(tasks.front());
-        tasks.pop_front();
+        task = std::move(tasks[head % CAPACITY]);
+        head++;
         return true;
     }
 };
