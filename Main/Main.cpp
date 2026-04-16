@@ -49,6 +49,7 @@ struct WorkerQueue {
     }
 };
 
+std::vector<Task> g_global_queue;
 std::vector<std::unique_ptr<WorkerQueue>> g_local_queues;
 std::mutex g_m;
 
@@ -59,11 +60,41 @@ std::atomic<bool> g_stop = false; // 작업 종료 신호
 
 std::atomic<double> g_sum = 0; // 작업 결과
 
-void Worker(int id)
+bool Steal(int id, WorkerQueue& my_q, Task& task)
 {
     static thread_local std::mt19937 gen(std::random_device { }());
     std::uniform_int_distribution<int> dis(0, g_local_queues.size() - 1);
 
+    for (int i = 0; i < g_local_queues.size(); i++) {
+        int victim_id = dis(gen);
+        if (victim_id == id)
+            continue;
+
+        if (g_local_queues[victim_id]->try_steal(task)) {
+            my_q.push(std::move(task));
+            return true;
+        }
+    }
+    return false;
+}
+
+bool Try_pop_global(WorkerQueue& my_q, Task& task)
+{
+    // 중앙 큐에서 작업 가져오기
+    std::lock_guard<std::mutex> lock(g_m);
+    int cnt = std::min(g_global_queue.size(), my_q.CAPACITY / 2);
+    if (cnt <= 0)
+        return false;
+
+    for (int i = 0; i < cnt && !g_global_queue.empty(); i++) {
+        my_q.push(std::move(g_global_queue.back()));
+        g_global_queue.pop_back();
+    }
+    return true;
+}
+
+void Worker(int id)
+{
     auto& my_q = *g_local_queues[id];
     while (true) {
         Task task = nullptr;
@@ -72,33 +103,23 @@ void Worker(int id)
             if (g_pending_tasks.fetch_sub(1, std::memory_order_acq_rel) == 1) {
                 g_task_done.notify_one();
             }
-        } else {
-            bool stolen = false;
-            for (int i = 0; i < g_local_queues.size(); i++) {
-                int victim_id = dis(gen);
-                if (victim_id == id)
-                    continue;
-
-                if (g_local_queues[victim_id]->try_steal(task)) {
-                    stolen = true;
-                    my_q.push(std::move(task));
-                    break;
-                }
-            }
-
-            if (!stolen) {
-                if (g_stop)
-                    break;
-                std::this_thread::yield();
-            }
+            continue;
         }
+
+        if (Steal(id, my_q, task) || Try_pop_global(my_q, task))
+            continue;
+
+        if (g_stop)
+            break;
+
+        std::this_thread::yield();
     }
 }
 
 void Dummy_task(int id)
 {
     double val = id;
-    int count = (id + 1) * 100000;
+    int count = (id + 5) * 50;
     for (int i = 0; i < count; i++) {
         val = std::sin(val + i) + std::cos(val - i);
     }
@@ -116,10 +137,13 @@ void RunTasks()
         workers.emplace_back(Worker, i);
     }
 
-    for (int i = 0; i < 10; i++) {
-        for (int j = 0; j < 100; j++) {
-            g_local_queues[j % num_threads]->push([i] { Dummy_task(i); });
-            g_pending_tasks.fetch_add(1, std::memory_order_acq_rel);
+    {
+        std::lock_guard<std::mutex> lock(g_m);
+        g_pending_tasks = num_threads * 100000;
+        for (int i = 0; i < num_threads; ++i) {
+            for (int j = 0; j < 100000; ++j) {
+                g_global_queue.push_back([i] { Dummy_task(i); });
+            }
         }
     }
 
