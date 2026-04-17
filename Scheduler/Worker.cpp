@@ -19,23 +19,11 @@ size_t Worker::TryFetchGlobal(size_t batch_size = 256)
 
     size_t cnt = std::min({ ctx.global_queue_.size() / ctx.num_threads_ + 1, kQueueSize_ - (queue_tail_ - queue_head_), batch_size });
     for (size_t i = 0; i < cnt; ++i) {
-        queue_[queue_tail_ % kQueueSize_] = std::move(ctx.global_queue_.front());
+        queue_[queue_tail_ % kQueueSize_] = ctx.global_queue_.front();
         queue_tail_++;
         ctx.global_queue_.pop_front();
     }
 
-    return cnt;
-}
-
-size_t Worker::FillBuffer(size_t batch_size = 64)
-{
-    std::unique_lock<std::mutex> lock(mtx_);
-    size_t cnt = std::min(queue_tail_ - queue_head_, batch_size);
-    for (size_t i = 0; i < cnt; ++i) {
-        buffer_[buffer_tail_ % kMaxBufferSize_] = std::move(queue_[queue_head_ % kQueueSize_]);
-        buffer_tail_++;
-        queue_head_++;
-    }
     return cnt;
 }
 
@@ -54,7 +42,7 @@ size_t Worker::TryStealFrom(Worker& victim, size_t batch_size = 256)
 
     size_t cnt = std::min({ (victim.queue_tail_ - victim.queue_head_ + 1) / 2, kQueueSize_ - (queue_tail_ - queue_head_), batch_size });
     for (size_t i = 0; i < cnt; ++i) {
-        queue_[queue_tail_ % kQueueSize_] = std::move(victim.queue_[victim.queue_head_ % kQueueSize_]);
+        queue_[queue_tail_ % kQueueSize_] = victim.queue_[victim.queue_head_ % kQueueSize_];
         queue_tail_++;
         victim.queue_head_++;
     }
@@ -74,16 +62,6 @@ size_t Worker::TryStealAny(size_t batch_size = 256)
             return cnt;
     }
     return 0;
-}
-
-Task* Worker::GetNextTask()
-{
-    if (buffer_tail_ - buffer_head_ > 0) {
-        Task* task = &buffer_[buffer_head_ % kMaxBufferSize_];
-        buffer_head_++;
-        return task;
-    }
-    return nullptr;
 }
 
 void Worker::Run(bool use_complex)
@@ -126,17 +104,17 @@ void Worker::RunComplex()
 void Worker::RunSimple()
 {
     while (true) {
-        Task task = nullptr;
+        Task* task = nullptr;
         {
             std::lock_guard<std::mutex> lock(ctx.mtx_);
             if (!ctx.global_queue_.empty()) {
-                task = std::move(ctx.global_queue_.front());
+                task = ctx.global_queue_.front();
                 ctx.global_queue_.pop_front();
             }
         }
 
         if (task) {
-            task();
+            (*task)();
             if (ctx.pending_tasks_.fetch_sub(1, std::memory_order_acq_rel) == 1) {
                 ctx.task_done_.notify_one();
             }

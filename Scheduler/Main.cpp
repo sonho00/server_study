@@ -9,7 +9,7 @@
 SchedulerContext ctx;
 
 // false: 단순 글로벌 큐 워커, true: 로컬 큐 + 워크 스틸링
-bool use_complex_worker = false;
+bool use_complex_worker = true;
 std::vector<Worker> workers(ctx.num_threads_);
 
 int MakeTask()
@@ -17,9 +17,10 @@ int MakeTask()
     std::lock_guard<std::mutex> lock(ctx.mtx_);
     for (int i = 0; i < ctx.num_threads_; ++i) {
         for (int j = 0; j < 100000; ++j) {
-            ctx.global_queue_.push_back([i] {
+            Task* task = new Task([i] {
                 workers[i].DummyTask(i * 50 + 250);
             });
+            ctx.global_queue_.push_back(task);
         }
     }
     return ctx.num_threads_ * 100000;

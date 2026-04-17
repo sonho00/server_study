@@ -12,7 +12,7 @@ using Task = std::function<void()>;
 struct SchedulerContext {
     int num_threads_ = std::thread::hardware_concurrency();
 
-    std::deque<Task> global_queue_;
+    std::deque<Task*> global_queue_;
     std::mutex mtx_;
 
     std::atomic<int> pending_tasks_;
