@@ -11,15 +11,13 @@ using Task = std::function<void()>;
 
 struct SchedulerContext {
     int num_threads = std::thread::hardware_concurrency();
-    
+
     std::deque<Task> global_queue;
-    std::mutex m;
+    std::mutex mtx;
 
     std::atomic<int> pending_tasks;
     std::atomic<bool> stop;
     std::condition_variable task_done;
-
-    std::atomic<double> sum;
 };
 
-SchedulerContext ctx;
+extern SchedulerContext ctx;
