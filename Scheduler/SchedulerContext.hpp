@@ -10,14 +10,14 @@
 using Task = std::function<void()>;
 
 struct SchedulerContext {
-    int num_threads = std::thread::hardware_concurrency();
+    int num_threads_ = std::thread::hardware_concurrency();
 
-    std::deque<Task> global_queue;
-    std::mutex mtx;
+    std::deque<Task> global_queue_;
+    std::mutex mtx_;
 
-    std::atomic<int> pending_tasks;
-    std::atomic<bool> stop;
-    std::condition_variable task_done;
+    std::atomic<int> pending_tasks_;
+    std::atomic<bool> stop_;
+    std::condition_variable task_done_;
 };
 
 extern SchedulerContext ctx;

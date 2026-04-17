@@ -9,36 +9,36 @@
 SchedulerContext ctx;
 
 // false: 단순 글로벌 큐 워커, true: 로컬 큐 + 워크 스틸링
-bool use_complex_worker = true;
-std::vector<Worker> workers(ctx.num_threads);
+bool use_complex_worker = false;
+std::vector<Worker> workers(ctx.num_threads_);
 
 int MakeTask()
 {
-    std::lock_guard<std::mutex> lock(ctx.mtx);
-    for (int i = 0; i < ctx.num_threads; ++i) {
+    std::lock_guard<std::mutex> lock(ctx.mtx_);
+    for (int i = 0; i < ctx.num_threads_; ++i) {
         for (int j = 0; j < 100000; ++j) {
-            ctx.global_queue.push_back([i] {
-                workers[i].Dummy_task(i * 50 + 250);
+            ctx.global_queue_.push_back([i] {
+                workers[i].DummyTask(i * 50 + 250);
             });
         }
     }
-    return ctx.num_threads * 100000;
+    return ctx.num_threads_ * 100000;
 }
 
 void RunTasks()
 {
-    ctx.pending_tasks = MakeTask();
+    ctx.pending_tasks_ = MakeTask();
 
     std::vector<std::thread> threads;
-    for (int i = 0; i < ctx.num_threads; i++) {
-        threads.emplace_back([i] { workers[i].run(use_complex_worker); });
+    for (int i = 0; i < ctx.num_threads_; i++) {
+        threads.emplace_back([i] { workers[i].Run(use_complex_worker); });
     }
 
     {
-        std::unique_lock<std::mutex> lock(ctx.mtx);
-        ctx.task_done.wait(lock, [] { return ctx.pending_tasks.load(std::memory_order_acquire) == 0; });
+        std::unique_lock<std::mutex> lock(ctx.mtx_);
+        ctx.task_done_.wait(lock, [] { return ctx.pending_tasks_.load(std::memory_order_acquire) == 0; });
     }
-    ctx.stop = true;
+    ctx.stop_ = true;
 
     for (auto& t : threads) {
         t.join();
@@ -53,17 +53,17 @@ int main()
     std::vector<double> elapsedTimes;
 
     for (int i = 0; i < iterations; i++) {
-        ctx.stop = false;
+        ctx.stop_ = false;
         for (auto& w : workers) {
-            w.queue_head = w.queue_tail = 0;
-            w.buffer_head = w.buffer_tail = 0;
-            w.task_did = 0;
-            w.sum = 0.0;
+            w.queue_head_ = w.queue_tail_ = 0;
+            w.buffer_head_ = w.buffer_tail_ = 0;
+            w.task_did_ = 0;
+            w.sum_ = 0.0;
         }
 
         {
-            std::lock_guard<std::mutex> lock(ctx.mtx);
-            ctx.global_queue.clear();
+            std::lock_guard<std::mutex> lock(ctx.mtx_);
+            ctx.global_queue_.clear();
         }
 
         auto start = std::chrono::high_resolution_clock::now();
@@ -80,7 +80,7 @@ int main()
 
         double total_sum = 0.0;
         for (const auto& w : workers) {
-            total_sum += w.sum.load(std::memory_order_relaxed);
+            total_sum += w.sum_.load(std::memory_order_relaxed);
         }
         std::cout << "- Total Sum: " << total_sum << std::endl;
     }
