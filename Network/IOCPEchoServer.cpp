@@ -9,24 +9,61 @@
 #include <winsock2.h>
 
 #include <iostream>
+#include <mutex>
+#include <stack>
 #include <thread>
 #include <vector>
 
 #pragma comment(lib, "ws2_32.lib")
 
-enum class Task { ACCEPT, READ, WRITE };
+enum class Task { NONE, ACCEPT, READ, WRITE };
 
 struct Session {
-	OVERLAPPED overlapped;
-	SOCKET socket;
-	WSABUF wsaBuf;
-	char buffer[1024];
-	Task taskType;
+	OVERLAPPED overlapped = {};
+	SOCKET socket = INVALID_SOCKET;
+	WSABUF wsaBuf = {};
+	char buffer[1024]{};
+	Task taskType = Task::NONE;
+};
+
+template <typename T, size_t PoolSize>
+class ObjectPool {
+   public:
+	ObjectPool() {
+		for (size_t i = 0; i < PoolSize; ++i) {
+			freeIndices.push(i);
+		}
+	}
+
+	void Push(T* obj) {
+		std::lock_guard<std::mutex> lock(mutex);
+		size_t index = obj - pool;
+		if (index < PoolSize) {
+			obj->~T();
+			freeIndices.push(index);
+		}
+	}
+
+	T* Pop() {
+		std::lock_guard<std::mutex> lock(mutex);
+		if (freeIndices.empty()) {
+			return nullptr;
+		}
+		T* obj = &pool[freeIndices.top()];
+		freeIndices.pop();
+		return new (obj) T();
+	}
+
+   private:
+	T pool[PoolSize];
+	std::stack<size_t> freeIndices;
+	std::mutex mutex;
 };
 
 HANDLE g_hIOCP = INVALID_HANDLE_VALUE;
 SOCKET g_listenSocket = INVALID_SOCKET;
 LPFN_ACCEPTEX g_lpfnAcceptEx = NULL;
+ObjectPool<Session, 1024> g_sessionPool;
 
 void PostAccept() {
 	SOCKET hAcceptSocket = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, NULL, 0,
@@ -37,8 +74,12 @@ void PostAccept() {
 		return;
 	}
 
-	Session* session = new Session();
-	ZeroMemory(session, sizeof(Session));
+	Session* session = g_sessionPool.Pop();
+	if (!session) {
+		std::cerr << "Failed to allocate session from pool." << std::endl;
+		closesocket(hAcceptSocket);
+		return;
+	}
 	session->socket = hAcceptSocket;
 	session->taskType = Task::ACCEPT;
 	session->wsaBuf.buf = session->buffer;
@@ -55,7 +96,7 @@ void PostAccept() {
 	if (!result && WSAGetLastError() != ERROR_IO_PENDING) {
 		std::cerr << "AcceptEx failed: " << WSAGetLastError() << std::endl;
 		closesocket(hAcceptSocket);
-		delete session;
+		g_sessionPool.Push(session);
 	}
 }
 
@@ -81,7 +122,7 @@ void WorkerThread() {
 				std::cerr << "I/O operation failed: " << GetLastError()
 						  << std::endl;
 				closesocket(session->socket);
-				delete session;
+				g_sessionPool.Push(session);
 				continue;
 			} else {
 				std::cerr << "GetQueuedCompletionStatus failed: "
@@ -93,7 +134,7 @@ void WorkerThread() {
 		if (bytesTransferred == 0 && session->taskType != Task::ACCEPT) {
 			std::cout << "Client disconnected." << std::endl;
 			closesocket(session->socket);
-			delete session;
+			g_sessionPool.Push(session);
 			continue;
 		}
 
@@ -123,7 +164,7 @@ void WorkerThread() {
 					std::cerr << "WSARecv failed: " << WSAGetLastError()
 							  << std::endl;
 					closesocket(session->socket);
-					delete session;
+					g_sessionPool.Push(session);
 				}
 				break;
 			}
@@ -149,7 +190,7 @@ void WorkerThread() {
 					std::cerr << "WSASend failed: " << WSAGetLastError()
 							  << std::endl;
 					closesocket(session->socket);
-					delete session;
+					g_sessionPool.Push(session);
 				}
 				break;
 			}
@@ -171,7 +212,7 @@ void WorkerThread() {
 					std::cerr << "WSARecv failed: " << WSAGetLastError()
 							  << std::endl;
 					closesocket(session->socket);
-					delete session;
+					g_sessionPool.Push(session);
 				}
 				break;
 			}
