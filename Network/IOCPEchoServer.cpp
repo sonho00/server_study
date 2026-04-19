@@ -1,41 +1,87 @@
 #include <WinSock2.h>
+#include <handleapi.h>
+#include <ioapiset.h>
+#include <minwinbase.h>
+#include <minwindef.h>
+#include <mswsock.h>
+#include <processthreadsapi.h>
+#include <winnt.h>
+#include <winsock2.h>
 
-#include <cstring>
 #include <iostream>
 #include <thread>
 #include <vector>
 
-
 #pragma comment(lib, "ws2_32.lib")
 
-enum class IO_TYPE { READ, WRITE };
+enum class Task { ACCEPT, READ, WRITE };
 
-struct OverlappedEx {
+struct Session {
 	OVERLAPPED overlapped;
 	SOCKET socket;
 	WSABUF wsaBuf;
 	char buffer[1024];
-	IO_TYPE ioType;
+	Task taskType;
 };
 
-DWORD WINAPI WorkerThread(LPVOID lpParam) {
-	HANDLE hIOCP = (HANDLE)lpParam;
+HANDLE g_hIOCP = INVALID_HANDLE_VALUE;
+SOCKET g_listenSocket = INVALID_SOCKET;
+LPFN_ACCEPTEX g_lpfnAcceptEx = NULL;
 
+void PostAccept() {
+	SOCKET hAcceptSocket = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, NULL, 0,
+									 WSA_FLAG_OVERLAPPED);
+	if (hAcceptSocket == INVALID_SOCKET) {
+		std::cerr << "WSASocket for accept failed: " << WSAGetLastError()
+				  << std::endl;
+		return;
+	}
+
+	Session* session = new Session();
+	ZeroMemory(session, sizeof(Session));
+	session->socket = hAcceptSocket;
+	session->taskType = Task::ACCEPT;
+	session->wsaBuf.buf = session->buffer;
+	session->wsaBuf.len = sizeof(session->buffer);
+	CreateIoCompletionPort((HANDLE)hAcceptSocket, g_hIOCP, (ULONG_PTR)session,
+						   0);
+
+	DWORD bytesReceived = 0;
+	DWORD addrLen = sizeof(sockaddr_in) + 16;
+	BOOL result =
+		g_lpfnAcceptEx(g_listenSocket, hAcceptSocket, session->buffer, 0,
+					   addrLen, addrLen, &bytesReceived, &session->overlapped);
+
+	if (!result && WSAGetLastError() != ERROR_IO_PENDING) {
+		std::cerr << "AcceptEx failed: " << WSAGetLastError() << std::endl;
+		closesocket(hAcceptSocket);
+		delete session;
+	}
+}
+
+void WorkerThread() {
 	while (true) {
+		Session* session = nullptr;
+		OVERLAPPED* pOverlapped = nullptr;
 		DWORD bytesTransferred = 0;
 		ULONG_PTR completionKey = 0;
-		OverlappedEx* ov = nullptr;
 
-		BOOL result =
-			GetQueuedCompletionStatus(hIOCP, &bytesTransferred, &completionKey,
-									  (LPOVERLAPPED*)&ov, INFINITE);
+		BOOL result = GetQueuedCompletionStatus(
+			g_hIOCP, &bytesTransferred, &completionKey, &pOverlapped, INFINITE);
+
+		// 리슨 소켓에서의 ACCEPT 작업은 completionKey가 0이고
+		// 다른 작업들은 completionKey가 Session 포인터를 가리킴
+		if (completionKey == 0)
+			session = (Session*)pOverlapped;
+		else
+			session = (Session*)completionKey;
 
 		if (!result) {
-			if (ov) {
+			if (session) {
 				std::cerr << "I/O operation failed: " << GetLastError()
 						  << std::endl;
-				closesocket(ov->socket);
-				delete ov;
+				closesocket(session->socket);
+				delete session;
 				continue;
 			} else {
 				std::cerr << "GetQueuedCompletionStatus failed: "
@@ -44,66 +90,108 @@ DWORD WINAPI WorkerThread(LPVOID lpParam) {
 			}
 		}
 
-		if (bytesTransferred == 0) {
+		if (bytesTransferred == 0 && session->taskType != Task::ACCEPT) {
 			std::cout << "Client disconnected." << std::endl;
-			if (ov) {
-				closesocket(ov->socket);
-				delete ov;
-			}
+			closesocket(session->socket);
+			delete session;
 			continue;
 		}
 
-		if (ov->ioType == IO_TYPE::READ) {
-			ov->ioType = IO_TYPE::WRITE;
-			ov->wsaBuf.len = bytesTransferred;
-			memset(&ov->overlapped, 0, sizeof(OVERLAPPED));
+		switch (session->taskType) {
+			case Task::ACCEPT: {
+				std::cout << "Client connected." << std::endl;
+				PostAccept();
 
-			DWORD sentBytes = 0;
-			if (WSASend(ov->socket, &ov->wsaBuf, 1, &sentBytes, 0,
-						&ov->overlapped, NULL) == SOCKET_ERROR) {
-				if (WSAGetLastError() != WSA_IO_PENDING) {
-					std::cerr << "WSASend failed: " << WSAGetLastError()
-							  << std::endl;
-					closesocket(ov->socket);
-					delete ov;
-				}
-			}
-		} else if (ov->ioType == IO_TYPE::WRITE) {
-			ov->ioType = IO_TYPE::READ;
-			ov->wsaBuf.len = 1024;
-			memset(ov->buffer, 0, 1024);
-			memset(&ov->overlapped, 0, sizeof(OVERLAPPED));
+				// AcceptEx로 새로 연결된 소켓을 리슨 소켓과 연결
+				setsockopt(session->socket, SOL_SOCKET,
+						   SO_UPDATE_ACCEPT_CONTEXT, (char*)&g_listenSocket,
+						   sizeof(g_listenSocket));
 
-			DWORD flags = 0;
-			DWORD recvBytes = 0;
-			if (WSARecv(ov->socket, &ov->wsaBuf, 1, &recvBytes, &flags,
-						&ov->overlapped, NULL) == SOCKET_ERROR) {
-				if (WSAGetLastError() != WSA_IO_PENDING) {
+				session->taskType = Task::READ;
+				session->wsaBuf.buf = session->buffer;
+				session->wsaBuf.len = sizeof(session->buffer);
+
+				DWORD flags = 0;
+				int recvResult =
+					WSARecv(session->socket, &session->wsaBuf, 1, NULL, &flags,
+							&session->overlapped, NULL);
+
+				// WSARecv가 즉시 완료되지 않으면 ERROR_IO_PENDING이 반환됨
+				// 이 경우는 정상적인 상황이므로 오류로 처리하지 않음
+				if (recvResult == SOCKET_ERROR &&
+					WSAGetLastError() != ERROR_IO_PENDING) {
 					std::cerr << "WSARecv failed: " << WSAGetLastError()
 							  << std::endl;
-					closesocket(ov->socket);
-					delete ov;
+					closesocket(session->socket);
+					delete session;
 				}
+				break;
+			}
+			case Task::READ: {
+				std::cout << "Received message from client: "
+						  << std::string(session->buffer, bytesTransferred)
+						  << std::endl;
+
+				session->taskType = Task::WRITE;
+				session->wsaBuf.buf = session->buffer;
+				session->wsaBuf.len = bytesTransferred;
+				ZeroMemory(&session->overlapped, sizeof(OVERLAPPED));
+
+				DWORD flags = 0;
+				int sendResult =
+					WSASend(session->socket, &session->wsaBuf, 1, NULL, flags,
+							&session->overlapped, NULL);
+
+				// WSASend가 즉시 완료되지 않으면 ERROR_IO_PENDING이 반환됨
+				// 이 경우는 정상적인 상황이므로 오류로 처리하지 않음
+				if (sendResult == SOCKET_ERROR &&
+					WSAGetLastError() != ERROR_IO_PENDING) {
+					std::cerr << "WSASend failed: " << WSAGetLastError()
+							  << std::endl;
+					closesocket(session->socket);
+					delete session;
+				}
+				break;
+			}
+			case Task::WRITE: {
+				session->taskType = Task::READ;
+				session->wsaBuf.buf = session->buffer;
+				session->wsaBuf.len = sizeof(session->buffer);
+				ZeroMemory(&session->overlapped, sizeof(OVERLAPPED));
+
+				DWORD flags = 0;
+				int recvResult =
+					WSARecv(session->socket, &session->wsaBuf, 1, NULL, &flags,
+							&session->overlapped, NULL);
+
+				// WSARecv가 즉시 완료되지 않으면 ERROR_IO_PENDING이 반환됨
+				// 이 경우는 정상적인 상황이므로 오류로 처리하지 않음
+				if (recvResult == SOCKET_ERROR &&
+					WSAGetLastError() != ERROR_IO_PENDING) {
+					std::cerr << "WSARecv failed: " << WSAGetLastError()
+							  << std::endl;
+					closesocket(session->socket);
+					delete session;
+				}
+				break;
 			}
 		}
 	}
-
-	return 0;
 }
 
 int main() {
-	std::cout << "Starting IOCP Echo Server..." << std::endl;
+	std::cout << "Starting echo server..." << std::endl;
 
-	WSADATA wsaData;
+	WSAData wsaData;
 	if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
 		std::cerr << "WSAStartup failed: " << WSAGetLastError() << std::endl;
 		return 1;
 	}
 
-	std::cout << "WSAStartup successful." << std::endl;
+	std::cout << "Echo server started on port 8080..." << std::endl;
 
-	HANDLE hIOCP = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, 0, 0);
-	if (hIOCP == NULL) {
+	g_hIOCP = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, 0, 0);
+	if (g_hIOCP == NULL) {
 		std::cerr << "CreateIoCompletionPort failed: " << GetLastError()
 				  << std::endl;
 		return 1;
@@ -111,108 +199,98 @@ int main() {
 
 	std::cout << "IOCP created successfully." << std::endl;
 
-	SOCKET listenSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-	if (listenSocket == INVALID_SOCKET) {
-		std::cerr << "socket failed: " << WSAGetLastError() << std::endl;
-		CloseHandle(hIOCP);
+	g_listenSocket = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, NULL, 0,
+							   WSA_FLAG_OVERLAPPED);
+	if (g_listenSocket == INVALID_SOCKET) {
+		std::cerr << "WSASocket failed: " << WSAGetLastError() << std::endl;
+		CloseHandle(g_hIOCP);
 		WSACleanup();
 		return 1;
 	}
 
 	std::cout << "Socket created successfully." << std::endl;
 
-	sockaddr_in serverAddr;
-	serverAddr.sin_family = AF_INET;
-	serverAddr.sin_addr.s_addr = INADDR_ANY;
-	serverAddr.sin_port = htons(8080);
-	if (bind(listenSocket, (sockaddr*)&serverAddr, sizeof(serverAddr)) ==
-		SOCKET_ERROR) {
-		std::cerr << "bind failed: " << WSAGetLastError() << std::endl;
-		closesocket(listenSocket);
-		CloseHandle(hIOCP);
-		WSACleanup();
-		return 1;
-	}
-
-	std::cout << "Socket bound to port 8080." << std::endl;
-
-	if (listen(listenSocket, SOMAXCONN) == SOCKET_ERROR) {
-		std::cerr << "listen failed: " << WSAGetLastError() << std::endl;
-		closesocket(listenSocket);
-		CloseHandle(hIOCP);
-		WSACleanup();
-		return 1;
-	}
-
-	std::cout << "Listening on port 8080." << std::endl;
-
-	if (CreateIoCompletionPort((HANDLE)listenSocket, hIOCP,
-							   (ULONG_PTR)listenSocket, 0) == NULL) {
-		std::cerr << "Failed to associate listen socket with IOCP: "
+	if (CreateIoCompletionPort((HANDLE)g_listenSocket, g_hIOCP, 0, 0) == NULL) {
+		std::cerr << "CreateIoCompletionPort for listen socket failed: "
 				  << GetLastError() << std::endl;
-		closesocket(listenSocket);
-		CloseHandle(hIOCP);
+		closesocket(g_listenSocket);
+		CloseHandle(g_hIOCP);
 		WSACleanup();
 		return 1;
 	}
 
 	std::cout << "Listen socket associated with IOCP." << std::endl;
 
+	sockaddr_in serverAddr;
+	serverAddr.sin_family = AF_INET;
+	serverAddr.sin_addr.s_addr = INADDR_ANY;
+	serverAddr.sin_port = htons(8080);
+	if (bind(g_listenSocket, (sockaddr*)&serverAddr, sizeof(serverAddr)) ==
+		SOCKET_ERROR) {
+		std::cerr << "bind failed: " << WSAGetLastError() << std::endl;
+		closesocket(g_listenSocket);
+		CloseHandle(g_hIOCP);
+		WSACleanup();
+		return 1;
+	}
+
+	std::cout << "Socket bound to port 8080." << std::endl;
+
+	if (listen(g_listenSocket, SOMAXCONN) == SOCKET_ERROR) {
+		std::cerr << "listen failed: " << WSAGetLastError() << std::endl;
+		closesocket(g_listenSocket);
+		CloseHandle(g_hIOCP);
+		WSACleanup();
+		return 1;
+	}
+
+	std::cout << "Listening for incoming connections..." << std::endl;
+
+	// AcceptEx 함수 포인터 로드
+	GUID guidAcceptEx = WSAID_ACCEPTEX;
+	DWORD dwBytes = 0;
+	if (WSAIoctl(g_listenSocket, SIO_GET_EXTENSION_FUNCTION_POINTER,
+				 &guidAcceptEx, sizeof(guidAcceptEx), &g_lpfnAcceptEx,
+				 sizeof(g_lpfnAcceptEx), &dwBytes, NULL,
+				 NULL) == SOCKET_ERROR) {
+		std::cerr << "WSAIoctl failed: " << WSAGetLastError() << std::endl;
+		closesocket(g_listenSocket);
+		CloseHandle(g_hIOCP);
+		WSACleanup();
+		return 1;
+	}
+
+	std::cout << "AcceptEx function pointer loaded." << std::endl;
+
 	const int numThreads = std::thread::hardware_concurrency();
 	std::vector<HANDLE> threads(numThreads);
 	for (int i = 0; i < numThreads; ++i) {
-		threads[i] = CreateThread(NULL, 0, WorkerThread, hIOCP, 0, NULL);
+		threads[i] = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)WorkerThread,
+								  NULL, 0, NULL);
 		if (threads[i] == NULL) {
 			std::cerr << "Failed to create worker thread: " << GetLastError()
 					  << std::endl;
 			for (int j = 0; j < i; ++j) {
 				CloseHandle(threads[j]);
 			}
-			closesocket(listenSocket);
-			CloseHandle(hIOCP);
+			closesocket(g_listenSocket);
+			CloseHandle(g_hIOCP);
 			WSACleanup();
 			return 1;
 		}
 	}
 
-	std::cout<< "Worker threads created: " << numThreads << std::endl;
+	std::cout << "Worker threads created: " << numThreads << std::endl;
 
-	while (true) {
-		sockaddr_in clientAddr;
-		int addrLen = sizeof(clientAddr);
+	PostAccept();
 
-		SOCKET clientSocket =
-			accept(listenSocket, (sockaddr*)&clientAddr, &addrLen);
-		if (clientSocket == INVALID_SOCKET) continue;
+	std::cout << "Echo server is running. Press Enter to stop..." << std::endl;
 
-		std::cout << "Client connected!" << std::endl;
+	Sleep(INFINITE);
 
-		CreateIoCompletionPort((HANDLE)clientSocket, hIOCP,
-							   (ULONG_PTR)clientSocket, 0);
-
-		OverlappedEx* ov = new OverlappedEx();
-		memset(ov, 0, sizeof(OverlappedEx));
-		ov->socket = clientSocket;
-		ov->ioType = IO_TYPE::READ;
-		ov->wsaBuf.buf = ov->buffer;
-		ov->wsaBuf.len = 1024;
-
-		DWORD flags = 0;
-		DWORD recvBytes = 0;
-
-		if (WSARecv(clientSocket, &ov->wsaBuf, 1, &recvBytes, &flags,
-					&ov->overlapped, NULL) == SOCKET_ERROR) {
-			if (WSAGetLastError() != WSA_IO_PENDING) {
-				std::cerr << "WSARecv failed: " << WSAGetLastError()
-						  << std::endl;
-				closesocket(clientSocket);
-				delete ov;
-			}
-		}
-	}
-
-	CloseHandle(hIOCP);
+	CloseHandle(g_hIOCP);
+	closesocket(g_listenSocket);
 	WSACleanup();
 
-	std::cout << "IOCP Echo Server shutting down." << std::endl;
+	std::cout << "Echo server stopped." << std::endl;
 }
