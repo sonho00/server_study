@@ -5,6 +5,7 @@
 #include <thread>
 #include <vector>
 
+#include "NetUtils.hpp"
 #include "ObjectPool.hpp"
 
 #pragma comment(lib, "ws2_32.lib")
@@ -28,14 +29,13 @@ void PostAccept() {
 	SOCKET hAcceptSocket = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, NULL, 0,
 									 WSA_FLAG_OVERLAPPED);
 	if (hAcceptSocket == INVALID_SOCKET) {
-		std::cerr << "WSASocket for accept failed: " << WSAGetLastError()
-				  << std::endl;
+		NetUtils::PrintError("WSASocket for accept failed");
 		return;
 	}
 
 	Session* session = g_sessionPool.Pop();
 	if (!session) {
-		std::cerr << "Failed to allocate session from pool." << std::endl;
+		NetUtils::PrintError("No available session objects");
 		closesocket(hAcceptSocket);
 		return;
 	}
@@ -53,7 +53,7 @@ void PostAccept() {
 					   addrLen, addrLen, &bytesReceived, &session->overlapped);
 
 	if (!result && WSAGetLastError() != ERROR_IO_PENDING) {
-		std::cerr << "AcceptEx failed: " << WSAGetLastError() << std::endl;
+		NetUtils::PrintError("AcceptEx failed");
 		closesocket(hAcceptSocket);
 		g_sessionPool.Push(session);
 	}
@@ -78,14 +78,12 @@ void WorkerThread() {
 
 		if (!result) {
 			if (session) {
-				std::cerr << "I/O operation failed: " << GetLastError()
-						  << std::endl;
-				closesocket(session->socket);
+				NetUtils::PrintError("I/O operation failed");
+				closesocket(session->socket_);
 				g_sessionPool.Push(session);
 				continue;
 			} else {
-				std::cerr << "GetQueuedCompletionStatus failed: "
-						  << GetLastError() << std::endl;
+				NetUtils::PrintError("GetQueuedCompletionStatus failed");
 				break;
 			}
 		}
@@ -120,9 +118,8 @@ void WorkerThread() {
 				// 이 경우는 정상적인 상황이므로 오류로 처리하지 않음
 				if (recvResult == SOCKET_ERROR &&
 					WSAGetLastError() != ERROR_IO_PENDING) {
-					std::cerr << "WSARecv failed: " << WSAGetLastError()
-							  << std::endl;
-					closesocket(session->socket);
+					NetUtils::PrintError("WSARecv failed");
+					closesocket(session->socket_);
 					g_sessionPool.Push(session);
 				}
 				break;
@@ -146,9 +143,8 @@ void WorkerThread() {
 				// 이 경우는 정상적인 상황이므로 오류로 처리하지 않음
 				if (sendResult == SOCKET_ERROR &&
 					WSAGetLastError() != ERROR_IO_PENDING) {
-					std::cerr << "WSASend failed: " << WSAGetLastError()
-							  << std::endl;
-					closesocket(session->socket);
+					NetUtils::PrintError("WSASend failed");
+					closesocket(session->socket_);
 					g_sessionPool.Push(session);
 				}
 				break;
@@ -168,9 +164,8 @@ void WorkerThread() {
 				// 이 경우는 정상적인 상황이므로 오류로 처리하지 않음
 				if (recvResult == SOCKET_ERROR &&
 					WSAGetLastError() != ERROR_IO_PENDING) {
-					std::cerr << "WSARecv failed: " << WSAGetLastError()
-							  << std::endl;
-					closesocket(session->socket);
+					NetUtils::PrintError("WSARecv failed");
+					closesocket(session->socket_);
 					g_sessionPool.Push(session);
 				}
 				break;
@@ -182,9 +177,7 @@ void WorkerThread() {
 int main() {
 	std::cout << "Starting echo server..." << std::endl;
 
-	WSAData wsaData;
-	if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
-		std::cerr << "WSAStartup failed: " << WSAGetLastError() << std::endl;
+	if (!NetUtils::Init()) {
 		return 1;
 	}
 
@@ -192,68 +185,32 @@ int main() {
 
 	g_hIOCP = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, 0, 0);
 	if (g_hIOCP == NULL) {
-		std::cerr << "CreateIoCompletionPort failed: " << GetLastError()
-				  << std::endl;
+		NetUtils::PrintError("CreateIoCompletionPort failed");
 		return 1;
 	}
 
 	std::cout << "IOCP created successfully." << std::endl;
 
-	g_listenSocket = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, NULL, 0,
-							   WSA_FLAG_OVERLAPPED);
+	g_listenSocket = NetUtils::CreateListenSocket(8080);
 	if (g_listenSocket == INVALID_SOCKET) {
-		std::cerr << "WSASocket failed: " << WSAGetLastError() << std::endl;
+		NetUtils::PrintError("Failed to create listen socket");
 		CloseHandle(g_hIOCP);
 		WSACleanup();
 		return 1;
 	}
-
 	std::cout << "Socket created successfully." << std::endl;
 
 	if (CreateIoCompletionPort((HANDLE)g_listenSocket, g_hIOCP, 0, 0) == NULL) {
-		std::cerr << "CreateIoCompletionPort for listen socket failed: "
-				  << GetLastError() << std::endl;
+		NetUtils::PrintError("CreateIoCompletionPort for listen socket failed");
 		closesocket(g_listenSocket);
 		CloseHandle(g_hIOCP);
 		WSACleanup();
 		return 1;
 	}
 
-	std::cout << "Listen socket associated with IOCP." << std::endl;
-
-	sockaddr_in serverAddr;
-	serverAddr.sin_family = AF_INET;
-	serverAddr.sin_addr.s_addr = INADDR_ANY;
-	serverAddr.sin_port = htons(8080);
-	if (bind(g_listenSocket, (sockaddr*)&serverAddr, sizeof(serverAddr)) ==
-		SOCKET_ERROR) {
-		std::cerr << "bind failed: " << WSAGetLastError() << std::endl;
-		closesocket(g_listenSocket);
-		CloseHandle(g_hIOCP);
-		WSACleanup();
-		return 1;
-	}
-
-	std::cout << "Socket bound to port 8080." << std::endl;
-
-	if (listen(g_listenSocket, SOMAXCONN) == SOCKET_ERROR) {
-		std::cerr << "listen failed: " << WSAGetLastError() << std::endl;
-		closesocket(g_listenSocket);
-		CloseHandle(g_hIOCP);
-		WSACleanup();
-		return 1;
-	}
-
-	std::cout << "Listening for incoming connections..." << std::endl;
-
-	// AcceptEx 함수 포인터 로드
-	GUID guidAcceptEx = WSAID_ACCEPTEX;
-	DWORD dwBytes = 0;
-	if (WSAIoctl(g_listenSocket, SIO_GET_EXTENSION_FUNCTION_POINTER,
-				 &guidAcceptEx, sizeof(guidAcceptEx), &g_lpfnAcceptEx,
-				 sizeof(g_lpfnAcceptEx), &dwBytes, NULL,
-				 NULL) == SOCKET_ERROR) {
-		std::cerr << "WSAIoctl failed: " << WSAGetLastError() << std::endl;
+	g_lpfnAcceptEx = NetUtils::GetAcceptEx(g_listenSocket);
+	if (!g_lpfnAcceptEx) {
+		NetUtils::PrintError("Failed to get AcceptEx function pointer");
 		closesocket(g_listenSocket);
 		CloseHandle(g_hIOCP);
 		WSACleanup();
@@ -268,8 +225,7 @@ int main() {
 		threads[i] = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)WorkerThread,
 								  NULL, 0, NULL);
 		if (threads[i] == NULL) {
-			std::cerr << "Failed to create worker thread: " << GetLastError()
-					  << std::endl;
+			NetUtils::PrintError("Failed to create worker thread");
 			for (int j = 0; j < i; ++j) {
 				CloseHandle(threads[j]);
 			}
@@ -283,8 +239,6 @@ int main() {
 	std::cout << "Worker threads created: " << numThreads << std::endl;
 
 	PostAccept();
-
-	std::cout << "Echo server is running. Press Enter to stop..." << std::endl;
 
 	Sleep(INFINITE);
 
