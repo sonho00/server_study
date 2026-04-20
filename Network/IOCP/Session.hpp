@@ -2,16 +2,13 @@
 
 #include <WinSock2.h>
 
-enum class Task { NONE, ACCEPT, READ, WRITE };
+#include "IocpObject.hpp"
 
-class Session {
+class Session : public IocpObject {
    public:
 	bool OnRead(DWORD bytesTransferred);
 	bool OnWrite();
+	bool Dispatch(OVERLAPPED* overlapped, DWORD bytesTransferred) override;
 
-	OVERLAPPED overlapped_ = {};
-	SOCKET socket_ = INVALID_SOCKET;
-	WSABUF wsaBuf_ = {};
 	char buffer_[1024]{};
-	Task taskType_ = Task::NONE;
 };

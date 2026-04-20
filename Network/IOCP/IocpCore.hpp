@@ -13,17 +13,16 @@ class IocpCore {
 	IocpCore() = default;
 	~IocpCore();
 
-	bool Init(SOCKET listenSocket);
+	bool Init();
 	bool Start(size_t threadCount);
 	bool Register(SOCKET socket, ULONG_PTR completionKey);
-	bool PostAccept();
+
+	ObjectPool<Session, 1024> sessionPool_;
 
    private:
 	static DWORD WINAPI WorkerThread(LPVOID lpParam);
 
 	HANDLE hIocp_;
-	SOCKET listenSocket_;
 
 	std::vector<HANDLE> threads_;
-	ObjectPool<Session, 1024> sessionPool_;
 };

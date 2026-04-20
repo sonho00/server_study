@@ -47,3 +47,14 @@ bool Session::OnWrite() {
 
 	return true;
 }
+
+bool Session::Dispatch(OVERLAPPED* overlapped, DWORD bytesTransferred) {
+	switch (taskType_) {
+		case Task::READ:
+			return OnRead(bytesTransferred);
+		case Task::WRITE:
+			return OnWrite();
+		default:
+			return false;
+	}
+}
