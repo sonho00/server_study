@@ -1,18 +1,11 @@
 #include <WinSock2.h>
-#include <handleapi.h>
-#include <ioapiset.h>
-#include <minwinbase.h>
-#include <minwindef.h>
 #include <mswsock.h>
-#include <processthreadsapi.h>
-#include <winnt.h>
-#include <winsock2.h>
 
 #include <iostream>
-#include <mutex>
-#include <stack>
 #include <thread>
 #include <vector>
+
+#include "ObjectPool.hpp"
 
 #pragma comment(lib, "ws2_32.lib")
 
@@ -24,40 +17,6 @@ struct Session {
 	WSABUF wsaBuf = {};
 	char buffer[1024]{};
 	Task taskType = Task::NONE;
-};
-
-template <typename T, size_t PoolSize>
-class ObjectPool {
-   public:
-	ObjectPool() {
-		for (size_t i = 0; i < PoolSize; ++i) {
-			freeIndices.push(i);
-		}
-	}
-
-	void Push(T* obj) {
-		std::lock_guard<std::mutex> lock(mutex);
-		size_t index = obj - pool;
-		if (index < PoolSize) {
-			obj->~T();
-			freeIndices.push(index);
-		}
-	}
-
-	T* Pop() {
-		std::lock_guard<std::mutex> lock(mutex);
-		if (freeIndices.empty()) {
-			return nullptr;
-		}
-		T* obj = &pool[freeIndices.top()];
-		freeIndices.pop();
-		return new (obj) T();
-	}
-
-   private:
-	T pool[PoolSize];
-	std::stack<size_t> freeIndices;
-	std::mutex mutex;
 };
 
 HANDLE g_hIOCP = INVALID_HANDLE_VALUE;
