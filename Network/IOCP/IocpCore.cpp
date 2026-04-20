@@ -30,12 +30,6 @@ bool IocpCore::Init(SOCKET listenSocket) {
 		return false;
 	}
 
-	lpfnAcceptEx_ = NetUtils::GetAcceptEx(listenSocket_);
-	if (!lpfnAcceptEx_) {
-		NetUtils::PrintError("Failed to get AcceptEx function pointer");
-		return false;
-	}
-
 	return true;
 }
 
@@ -92,9 +86,9 @@ bool IocpCore::PostAccept() {
 
 	DWORD bytesReceived = 0;
 	DWORD addrLen = sizeof(sockaddr_in) + 16;
-	BOOL result =
-		lpfnAcceptEx_(listenSocket_, hAcceptSocket, session->buffer_, 0,
-					  addrLen, addrLen, &bytesReceived, &session->overlapped_);
+	BOOL result = NetUtils::AcceptEx(listenSocket_, hAcceptSocket,
+									 session->buffer_, 0, addrLen, addrLen,
+									 &bytesReceived, &session->overlapped_);
 
 	if (!result && WSAGetLastError() != ERROR_IO_PENDING) {
 		NetUtils::PrintError("AcceptEx failed");

@@ -23,7 +23,6 @@ class IocpCore {
 
 	HANDLE hIocp_;
 	SOCKET listenSocket_;
-	LPFN_ACCEPTEX lpfnAcceptEx_;
 
 	std::vector<HANDLE> threads_;
 	ObjectPool<Session, 1024> sessionPool_;

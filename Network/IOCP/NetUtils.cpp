@@ -1,5 +1,7 @@
 #include "NetUtils.hpp"
 
+#include <WinSock2.h>
+
 namespace NetUtils {
 bool Init() {
 	WSADATA wsaData;
@@ -8,6 +10,13 @@ bool Init() {
 		PrintError("WSAStartup failed");
 		return false;
 	}
+
+	if(!GetAcceptEx()) {
+		PrintError("Failed to get AcceptEx function pointer");
+		WSACleanup();
+		return false;
+	}
+	
 	return true;
 }
 
@@ -40,20 +49,25 @@ SOCKET CreateListenSocket(USHORT port) {
 	return listenSocket;
 }
 
-LPFN_ACCEPTEX GetAcceptEx(SOCKET listen_socket) {
+bool GetAcceptEx() {
+	SOCKET dummySocket = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, NULL, 0,
+								   WSA_FLAG_OVERLAPPED);
 	GUID guidAcceptEx = WSAID_ACCEPTEX;
 	LPFN_ACCEPTEX lpfnAcceptEx = nullptr;
 	DWORD bytesReturned = 0;
 
-	int result = WSAIoctl(listen_socket, SIO_GET_EXTENSION_FUNCTION_POINTER,
+	int result = WSAIoctl(dummySocket, SIO_GET_EXTENSION_FUNCTION_POINTER,
 						  &guidAcceptEx, sizeof(guidAcceptEx), &lpfnAcceptEx,
 						  sizeof(lpfnAcceptEx), &bytesReturned, NULL, NULL);
 
 	if (result == SOCKET_ERROR) {
 		PrintError("WSAIoctl failed to get AcceptEx pointer");
-		return nullptr;
+		return false;
 	}
 
-	return lpfnAcceptEx;
+	AcceptEx = lpfnAcceptEx;
+	return true;
 }
+
+LPFN_ACCEPTEX AcceptEx = nullptr;
 }  // namespace NetUtils

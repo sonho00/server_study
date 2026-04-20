@@ -8,9 +8,10 @@
 namespace NetUtils {
 bool Init();
 SOCKET CreateListenSocket(USHORT port);
-LPFN_ACCEPTEX GetAcceptEx(SOCKET listen_socket);
+bool GetAcceptEx();
 inline void PrintError(const char* msg) {
 	int errorCode = WSAGetLastError();
 	std::cerr << msg << " Error Code: " << errorCode << std::endl;
 }
+extern LPFN_ACCEPTEX AcceptEx;
 }  // namespace NetUtils
