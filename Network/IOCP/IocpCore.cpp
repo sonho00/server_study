@@ -8,6 +8,12 @@
 IocpCore::~IocpCore() {
 	for (HANDLE thread : threads_) {
 		if (thread) {
+			PostQueuedCompletionStatus(hIocp_, 0, 0, NULL);
+		}
+	}
+
+	for (HANDLE thread : threads_) {
+		if (thread) {
 			WaitForSingleObject(thread, INFINITE);
 			CloseHandle(thread);
 		}
@@ -66,13 +72,16 @@ DWORD WINAPI IocpCore::WorkerThread(LPVOID lpParam) {
 		iocpObject = (IocpObject*)completionKey;
 
 		if (!result) {
+			int error = WSAGetLastError();
+			if (error == WSA_OPERATION_ABORTED) {
+				std::cout << "IOCP is shutting down." << std::endl;
+				break;
+			}
+
 			if (iocpObject) {
 				NetUtils::PrintError("I/O operation failed");
 				iocp->sessionPool_.Push((Session*)iocpObject);
 				continue;
-			} else {
-				NetUtils::PrintError("GetQueuedCompletionStatus failed");
-				break;
 			}
 		}
 

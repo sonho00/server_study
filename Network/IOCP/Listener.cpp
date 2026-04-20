@@ -10,14 +10,13 @@
 bool Listener::Init() {
 	socket_ = NetUtils::CreateListenSocket(port_);
 	if (socket_ == INVALID_SOCKET) {
+		NetUtils::PrintError("Failed to create listen socket");
 		return false;
 	}
 	taskType_ = Task::ACCEPT;
 
 	if (!iocpCore_->Register(socket_, (ULONG_PTR)this)) {
 		NetUtils::PrintError("Failed to register listener socket with IOCP");
-		closesocket(socket_);
-		socket_ = INVALID_SOCKET;
 		return false;
 	}
 
@@ -26,11 +25,17 @@ bool Listener::Init() {
 
 bool Listener::Dispatch(OVERLAPPED* overlapped, DWORD bytesTransferred) {
 	std::cout << "Client connected." << std::endl;
-	PostAccept();
+	if (!PostAccept()) {
+		NetUtils::PrintError("Failed to post accept");
+		return false;
+	}
 
 	Session* session = (Session*)((size_t)overlapped - 8);
-	setsockopt(session->socket_, SOL_SOCKET, SO_UPDATE_ACCEPT_CONTEXT,
-			   (char*)&socket_, sizeof(socket_));
+	if (setsockopt(session->socket_, SOL_SOCKET, SO_UPDATE_ACCEPT_CONTEXT,
+				   (char*)&socket_, sizeof(socket_)) == SOCKET_ERROR) {
+		NetUtils::PrintError("setsockopt failed");
+		return false;
+	}
 
 	session->taskType_ = Task::READ;
 	session->wsaBuf_.buf = session->buffer_;

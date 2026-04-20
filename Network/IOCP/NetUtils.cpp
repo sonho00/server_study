@@ -4,19 +4,12 @@
 
 namespace NetUtils {
 bool Init() {
-	WSADATA wsaData;
-	int result = WSAStartup(MAKEWORD(2, 2), &wsaData);
-	if (result != 0) {
-		PrintError("WSAStartup failed");
-		return false;
-	}
-
-	if(!GetAcceptEx()) {
+	if (!GetAcceptEx()) {
 		PrintError("Failed to get AcceptEx function pointer");
 		WSACleanup();
 		return false;
 	}
-	
+
 	return true;
 }
 
