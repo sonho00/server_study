@@ -3,3 +3,5 @@
 -Wextra
 -Wunused-parameter
 -I.
+-I./Network/IOCP
+-I./Network/Protocol
