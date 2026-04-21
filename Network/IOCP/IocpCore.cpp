@@ -2,6 +2,8 @@
 
 #include <WinSock2.h>
 
+#include <memory>
+
 #include "IocpObject.hpp"
 #include "NetUtils.hpp"
 
@@ -71,6 +73,18 @@ DWORD WINAPI IocpCore::WorkerThread(LPVOID lpParam) {
 
 		iocpObject = reinterpret_cast<IocpObject*>(completionKey);
 
+		if (!iocpObject) {
+			if (result) {
+				std::cout << "IOCP is shutting down." << std::endl;
+				break;
+			} else {
+				NetUtils::PrintError("GetQueuedCompletionStatus failed");
+				continue;
+			}
+		}
+
+		std::shared_ptr<IocpObject> objPtr = iocpObject->shared_from_this();
+
 		if (!result) {
 			int error = WSAGetLastError();
 			if (error == WSA_OPERATION_ABORTED) {
@@ -78,26 +92,24 @@ DWORD WINAPI IocpCore::WorkerThread(LPVOID lpParam) {
 				break;
 			}
 
-			if (iocpObject) {
-				if (iocpObject->taskType_ == Task::ACCEPT) {
-					NetUtils::PrintError("Accept operation failed");
-				} else {
-					NetUtils::PrintError("I/O operation failed");
-					iocp->sessionPool_.Push(static_cast<Session*>(iocpObject));
-				}
-				continue;
+			if (objPtr->taskType_ == Task::ACCEPT) {
+				NetUtils::PrintError("Accept operation failed");
+			} else {
+				NetUtils::PrintError("I/O operation failed");
+				objPtr->Close();
 			}
-		}
-
-		if (bytesTransferred == 0 && iocpObject->taskType_ != Task::ACCEPT) {
-			std::cout << "Connection closed by client." << std::endl;
-			iocp->sessionPool_.Push(static_cast<Session*>(iocpObject));
 			continue;
 		}
 
-		if (!iocpObject->Dispatch(pOverlapped, bytesTransferred)) {
+		if (bytesTransferred == 0 && objPtr->taskType_ != Task::ACCEPT) {
+			std::cout << "Connection closed by client." << std::endl;
+			objPtr->Close();
+			continue;
+		}
+
+		if (!objPtr->Dispatch(pOverlapped, bytesTransferred)) {
 			NetUtils::PrintError("Dispatch failed");
-			iocp->sessionPool_.Push(static_cast<Session*>(iocpObject));
+			objPtr->Close();
 			continue;
 		}
 	}

@@ -2,13 +2,17 @@
 
 #include <WinSock2.h>
 
+#include "ObjectPool.hpp"
+
 enum class Task { NONE, ACCEPT, READ, WRITE };
 
-class IocpObject {
+class IocpObject : public PoolElement<IocpObject> {
    public:
-	virtual ~IocpObject() {
+	virtual void Close() {
+		Release();
 		if (socket_ != INVALID_SOCKET) {
 			closesocket(socket_);
+			socket_ = INVALID_SOCKET;
 		}
 	}
 	virtual bool Dispatch(OVERLAPPED* overlapped, DWORD bytesTransferred) = 0;

@@ -63,10 +63,10 @@ bool Listener::PostAccept() {
 		return false;
 	}
 
-	Session* session = iocpCore_->sessionPool_.Pop();
+	std::shared_ptr<Session> session = iocpCore_->sessionPool_.Pop();
 	if (!session) {
 		NetUtils::PrintError("Failed to get session from pool");
-		iocpCore_->sessionPool_.Push(session);
+		session->Close();
 		return false;
 	}
 
@@ -75,9 +75,10 @@ bool Listener::PostAccept() {
 	session->wsaBuf_.buf = session->buffer_;
 	session->wsaBuf_.len = sizeof(session->buffer_);
 
-	if (!iocpCore_->Register(hAcceptSocket, reinterpret_cast<ULONG_PTR>(session))) {
+	if (!iocpCore_->Register(hAcceptSocket,
+							 reinterpret_cast<ULONG_PTR>(session.get()))) {
 		NetUtils::PrintError("Failed to register accept socket with IOCP");
-		iocpCore_->sessionPool_.Push(session);
+		session->Close();
 		return false;
 	}
 
@@ -89,7 +90,7 @@ bool Listener::PostAccept() {
 
 	if (!result && WSAGetLastError() != ERROR_IO_PENDING) {
 		NetUtils::PrintError("AcceptEx failed");
-		iocpCore_->sessionPool_.Push(session);
+		session->Close();
 		return false;
 	}
 

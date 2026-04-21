@@ -24,8 +24,8 @@ int main() {
 		return 1;
 	}
 
-	Listener listener(&iocp, 8080);
-	if (!listener.Init()) {
+	auto listener = std::make_shared<Listener>(&iocp, static_cast<u_short>(8080));
+	if (!listener->Init()) {
 		NetUtils::PrintError("Failed to initialize listener");
 		return 1;
 	}
@@ -35,7 +35,7 @@ int main() {
 		return 1;
 	}
 
-	if (!listener.PostAccept()) {
+	if (!listener->PostAccept()) {
 		NetUtils::PrintError("Failed to post initial accept");
 		return 1;
 	}
@@ -43,6 +43,8 @@ int main() {
 	// 유저의 종료 신호를 기다립니다. 예: Enter 키
 	std::cout << "Echo server is running. Press Enter to stop..." << std::endl;
 	std::cin.get();
+
+	std::cout << "Shutting down server..." << std::endl;
 
 	return 0;
 }
