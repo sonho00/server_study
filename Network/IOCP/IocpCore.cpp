@@ -49,8 +49,8 @@ bool IocpCore::Start(size_t threadCount) {
 }
 
 bool IocpCore::Register(SOCKET socket, ULONG_PTR completionKey) {
-	if (CreateIoCompletionPort((HANDLE)socket, hIocp_, completionKey, 0) ==
-		nullptr) {
+	if (CreateIoCompletionPort(reinterpret_cast<HANDLE>(socket), hIocp_,
+							   completionKey, 0) == nullptr) {
 		NetUtils::PrintError("Failed to register socket with IOCP");
 		return false;
 	}
@@ -58,7 +58,7 @@ bool IocpCore::Register(SOCKET socket, ULONG_PTR completionKey) {
 }
 
 DWORD WINAPI IocpCore::WorkerThread(LPVOID lpParam) {
-	IocpCore* iocp = (IocpCore*)lpParam;
+	IocpCore* iocp = static_cast<IocpCore*>(lpParam);
 	while (true) {
 		IocpObject* iocpObject = nullptr;
 		OVERLAPPED* pOverlapped = nullptr;
@@ -69,7 +69,7 @@ DWORD WINAPI IocpCore::WorkerThread(LPVOID lpParam) {
 			GetQueuedCompletionStatus(iocp->hIocp_, &bytesTransferred,
 									  &completionKey, &pOverlapped, INFINITE);
 
-		iocpObject = (IocpObject*)completionKey;
+		iocpObject = reinterpret_cast<IocpObject*>(completionKey);
 
 		if (!result) {
 			int error = WSAGetLastError();
@@ -79,22 +79,25 @@ DWORD WINAPI IocpCore::WorkerThread(LPVOID lpParam) {
 			}
 
 			if (iocpObject) {
-				NetUtils::PrintError("I/O operation failed");
-				iocp->sessionPool_.Push((Session*)iocpObject);
+				if (iocpObject->taskType_ == Task::ACCEPT) {
+					NetUtils::PrintError("Accept operation failed");
+				} else {
+					NetUtils::PrintError("I/O operation failed");
+					iocp->sessionPool_.Push(static_cast<Session*>(iocpObject));
+				}
 				continue;
 			}
 		}
 
 		if (bytesTransferred == 0 && iocpObject->taskType_ != Task::ACCEPT) {
-			std::cout << "Client disconnected." << std::endl;
-			iocp->sessionPool_.Push((Session*)iocpObject);
+			std::cout << "Connection closed by client." << std::endl;
+			iocp->sessionPool_.Push(static_cast<Session*>(iocpObject));
 			continue;
 		}
 
 		if (!iocpObject->Dispatch(pOverlapped, bytesTransferred)) {
-			std::cout << "Dispatch failed for completion key: " << completionKey
-					  << std::endl;
-			iocp->sessionPool_.Push((Session*)iocpObject);
+			NetUtils::PrintError("Dispatch failed");
+			iocp->sessionPool_.Push(static_cast<Session*>(iocpObject));
 			continue;
 		}
 	}

@@ -26,7 +26,7 @@ SOCKET CreateListenSocket(USHORT port) {
 	serverAddr.sin_addr.s_addr = INADDR_ANY;
 	serverAddr.sin_port = htons(port);
 
-	if (bind(listenSocket, (sockaddr*)&serverAddr, sizeof(serverAddr)) ==
+	if (bind(listenSocket, reinterpret_cast<sockaddr*>(&serverAddr), sizeof(serverAddr)) ==
 		SOCKET_ERROR) {
 		PrintError("bind failed");
 		closesocket(listenSocket);

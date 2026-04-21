@@ -15,7 +15,7 @@ bool Listener::Init() {
 	}
 	taskType_ = Task::ACCEPT;
 
-	if (!iocpCore_->Register(socket_, (ULONG_PTR)this)) {
+	if (!iocpCore_->Register(socket_, reinterpret_cast<ULONG_PTR>(this))) {
 		NetUtils::PrintError("Failed to register listener socket with IOCP");
 		return false;
 	}
@@ -30,9 +30,10 @@ bool Listener::Dispatch(OVERLAPPED* overlapped, DWORD bytesTransferred) {
 		return false;
 	}
 
-	Session* session = (Session*)((size_t)overlapped - 8);
+	Session* session = CONTAINING_RECORD(overlapped, Session, overlapped_);
 	if (setsockopt(session->socket_, SOL_SOCKET, SO_UPDATE_ACCEPT_CONTEXT,
-				   (char*)&socket_, sizeof(socket_)) == SOCKET_ERROR) {
+				   reinterpret_cast<const char*>(&socket_),
+				   sizeof(socket_)) == SOCKET_ERROR) {
 		NetUtils::PrintError("setsockopt failed");
 		return false;
 	}
@@ -74,7 +75,7 @@ bool Listener::PostAccept() {
 	session->wsaBuf_.buf = session->buffer_;
 	session->wsaBuf_.len = sizeof(session->buffer_);
 
-	if (!iocpCore_->Register(hAcceptSocket, (ULONG_PTR)session)) {
+	if (!iocpCore_->Register(hAcceptSocket, reinterpret_cast<ULONG_PTR>(session))) {
 		NetUtils::PrintError("Failed to register accept socket with IOCP");
 		iocpCore_->sessionPool_.Push(session);
 		return false;
