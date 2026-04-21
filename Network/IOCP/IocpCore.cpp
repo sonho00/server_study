@@ -1,11 +1,14 @@
 #include "IocpCore.hpp"
 
 #include <WinSock2.h>
+#include <basetsd.h>
 
 #include <memory>
 
-#include "IocpObject.hpp"
+#include "Listener.hpp"
 #include "NetUtils.hpp"
+#include "OverlappedEx.hpp"
+#include "Session.hpp"
 
 IocpCore::~IocpCore() {
 	for (HANDLE thread : threads_) {
@@ -62,7 +65,6 @@ bool IocpCore::Register(SOCKET socket, ULONG_PTR completionKey) {
 DWORD WINAPI IocpCore::WorkerThread(LPVOID lpParam) {
 	IocpCore* iocp = static_cast<IocpCore*>(lpParam);
 	while (true) {
-		IocpObject* iocpObject = nullptr;
 		OVERLAPPED* pOverlapped = nullptr;
 		DWORD bytesTransferred = 0;
 		ULONG_PTR completionKey = 0;
@@ -71,9 +73,12 @@ DWORD WINAPI IocpCore::WorkerThread(LPVOID lpParam) {
 			GetQueuedCompletionStatus(iocp->hIocp_, &bytesTransferred,
 									  &completionKey, &pOverlapped, INFINITE);
 
-		iocpObject = reinterpret_cast<IocpObject*>(completionKey);
+		OverlappedEx<Session::kReadBufferSize>* pOverlappedEx =
+			CONTAINING_RECORD(pOverlapped,
+							  OverlappedEx<Session::kReadBufferSize>,
+							  overlapped_);
 
-		if (!iocpObject) {
+		if (!pOverlappedEx) {
 			if (result) {
 				std::cout << "IOCP is shutting down." << std::endl;
 				break;
@@ -83,8 +88,6 @@ DWORD WINAPI IocpCore::WorkerThread(LPVOID lpParam) {
 			}
 		}
 
-		std::shared_ptr<IocpObject> objPtr = iocpObject->shared_from_this();
-
 		if (!result) {
 			int error = WSAGetLastError();
 			if (error == WSA_OPERATION_ABORTED) {
@@ -92,25 +95,39 @@ DWORD WINAPI IocpCore::WorkerThread(LPVOID lpParam) {
 				break;
 			}
 
-			if (objPtr->taskType_ == Task::ACCEPT) {
+			if (pOverlappedEx->taskType_ == Task::ACCEPT) {
 				NetUtils::PrintError("Accept operation failed");
 			} else {
 				NetUtils::PrintError("I/O operation failed");
+
+				std::shared_ptr<Session> objPtr =
+					reinterpret_cast<Session*>(completionKey)
+						->shared_from_this();
 				objPtr->Close();
 			}
 			continue;
 		}
 
-		if (bytesTransferred == 0 && objPtr->taskType_ != Task::ACCEPT) {
-			std::cout << "Connection closed by client." << std::endl;
-			objPtr->Close();
-			continue;
-		}
+		if (pOverlappedEx->taskType_ == Task::ACCEPT) {
+			Listener* listener = reinterpret_cast<Listener*>(completionKey);
+			if (!listener->HandleAccept(pOverlappedEx, bytesTransferred)) {
+				NetUtils::PrintError("Failed to handle accept");
+				continue;
+			}
+		} else {
+			std::shared_ptr<Session> objPtr =
+				reinterpret_cast<Session*>(completionKey)->shared_from_this();
 
-		if (!objPtr->Dispatch(pOverlapped, bytesTransferred)) {
-			NetUtils::PrintError("Dispatch failed");
-			objPtr->Close();
-			continue;
+			if (bytesTransferred == 0) {
+				std::cout << "Connection closed by client." << std::endl;
+				objPtr->Close();
+				continue;
+			}
+
+			if (!objPtr->HandleIO(pOverlappedEx, bytesTransferred)) {
+				NetUtils::PrintError("Failed to handle I/O");
+				objPtr->Close();
+			}
 		}
 	}
 

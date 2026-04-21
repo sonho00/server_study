@@ -4,6 +4,8 @@
 #include <iostream>
 #include <thread>
 
+#include "Protocol.hpp"
+
 #pragma comment(lib, "ws2_32.lib")
 
 int main() {
@@ -40,11 +42,18 @@ int main() {
 
 	std::cout << "Connected to echo server." << std::endl;
 
-	const char* message = "Hello, Echo Server!";
+	C2S_CHAT chatPacket;
+	chatPacket.header.id = PacketID::C2S_CHAT;
+	chatPacket.header.size =
+		sizeof(PacketHeader) + sizeof("Hello, Echo Server!");
+	strcpy_s(chatPacket.message, sizeof(chatPacket.message),
+			 "Hello, Echo Server!");
 
-	std::thread thread([clientSocket, message]() {
+	std::thread thread([clientSocket, chatPacket]() {
 		while (true) {
-			int bytesSent = send(clientSocket, message, strlen(message), 0);
+			int bytesSent =
+				send(clientSocket, reinterpret_cast<const char*>(&chatPacket),
+					 chatPacket.header.size, 0);
 			if (bytesSent == SOCKET_ERROR) {
 				std::cerr << "send failed: " << WSAGetLastError() << std::endl;
 				closesocket(clientSocket);
@@ -52,7 +61,8 @@ int main() {
 				break;
 			}
 
-			std::cout << "Message sent to server: " << message << std::endl;
+			std::cout << "Message sent to server: " << chatPacket.message
+					  << std::endl;
 
 			char buffer[1024];
 			int bytesReceived =
@@ -65,8 +75,8 @@ int main() {
 			}
 			buffer[bytesReceived] = '\0';
 
-			std::cout << "Message received from server: " << buffer
-					  << std::endl;
+			std::cout << "Message received from server: "
+					  << buffer + sizeof(PacketHeader) << std::endl;
 
 			Sleep(1000);
 		}

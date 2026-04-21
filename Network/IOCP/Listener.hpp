@@ -1,19 +1,24 @@
 #pragma once
 
-#include "IocpCore.hpp"
-#include "IocpObject.hpp"
+#include <WinSock2.h>
 
-class Listener : public IocpObject {
+#include "IocpCore.hpp"
+#include "OverlappedEx.hpp"
+
+class Listener {
    public:
 	Listener(IocpCore* iocpCore, unsigned short port)
 		: iocpCore_(iocpCore), port_(port) {}
 
 	bool Init();
-	bool Dispatch(OVERLAPPED* overlapped, DWORD bytesTransferred) override;
+	bool HandleAccept(OverlappedEx<Session::kReadBufferSize>* overlappedEx,
+					  DWORD bytesTransferred);
 	bool PostAccept();
 
    private:
-	char buffer_[sizeof(sockaddr_in) + 16] = {};
+	OverlappedEx<sizeof(sockaddr_in) + 16> acceptOv;
+	SOCKET socket_ = INVALID_SOCKET;
+
 	IocpCore* iocpCore_ = nullptr;
 	unsigned short port_ = 0;
 };

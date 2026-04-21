@@ -1,14 +1,24 @@
 #pragma once
 
 #include <WinSock2.h>
+#include <minwindef.h>
 
-#include "IocpObject.hpp"
+#include <functional>
 
-class Session : public IocpObject {
+#include "ObjectPool.hpp"
+#include "OverlappedEx.hpp"
+
+class Session : public PoolElement<Session> {
    public:
-	bool OnRead(DWORD bytesTransferred);
-	bool OnWrite();
-	bool Dispatch(OVERLAPPED* overlapped, DWORD bytesTransferred) override;
+	constexpr static size_t kReadBufferSize = 256;
+	constexpr static size_t kWriteBufferSize = 256;
 
-	char buffer_[1024]{};
+	bool OnRead(DWORD bytesTransferred);
+	bool OnWrite(DWORD bytesTransferred);
+	bool HandleIO(OverlappedEx<kReadBufferSize>* ovEx, DWORD bytesTransferred);
+	void Close();
+
+	OverlappedEx<kReadBufferSize> readOv;
+	OverlappedEx<kWriteBufferSize> writeOv;
+	SOCKET socket_ = INVALID_SOCKET;
 };

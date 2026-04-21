@@ -1,4 +1,5 @@
 #include <WinSock2.h>
+#include <basetsd.h>
 #include <mswsock.h>
 
 #include <iostream>
@@ -24,8 +25,8 @@ int main() {
 		return 1;
 	}
 
-	auto listener = std::make_shared<Listener>(&iocp, static_cast<u_short>(8080));
-	if (!listener->Init()) {
+	Listener listener(&iocp, static_cast<u_short>(8080));
+	if (!listener.Init()) {
 		NetUtils::PrintError("Failed to initialize listener");
 		return 1;
 	}
@@ -35,7 +36,7 @@ int main() {
 		return 1;
 	}
 
-	if (!listener->PostAccept()) {
+	if (!listener.PostAccept()) {
 		NetUtils::PrintError("Failed to post initial accept");
 		return 1;
 	}

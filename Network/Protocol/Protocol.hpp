@@ -18,16 +18,28 @@ struct PacketHeader {
 	PacketID id;
 };
 
-struct MovePacket {
+struct C2S_MOVE {
 	PacketHeader header;
 	float x;
 	float y;
 };
 
-struct ChatPacket {
+struct S2C_MOVE {
 	PacketHeader header;
-	uint16_t len;
-	wchar_t message[256];
+	int sessionId;
+	float x;
+	float y;
+};
+
+struct C2S_CHAT {
+	PacketHeader header;
+	char message[256];
+};
+
+struct S2C_CHAT {
+	PacketHeader header;
+	int sessionId;
+	char message[256];
 };
 
 #pragma pack(pop)
