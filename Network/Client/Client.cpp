@@ -43,9 +43,9 @@ int main() {
 	std::cout << "Connected to echo server." << std::endl;
 
 	C2S_CHAT chatPacket;
-	chatPacket.header.id = PacketID::C2S_CHAT;
+	chatPacket.header.id = C2S_PACKET_ID::CHAT;
 	chatPacket.header.size =
-		sizeof(PacketHeader) + sizeof("Hello, Echo Server!");
+		sizeof(PACKET_HEADER) + sizeof("Hello, Echo Server!");
 	strcpy_s(chatPacket.message, sizeof(chatPacket.message),
 			 "Hello, Echo Server!");
 
@@ -76,7 +76,7 @@ int main() {
 			buffer[bytesReceived] = '\0';
 
 			std::cout << "Message received from server: "
-					  << buffer + sizeof(PacketHeader) << std::endl;
+					  << buffer + sizeof(PACKET_HEADER) << std::endl;
 
 			Sleep(1000);
 		}

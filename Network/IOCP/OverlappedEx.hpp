@@ -2,6 +2,8 @@
 
 #include <WinSock2.h>
 
+#include <cstddef>
+
 enum class Task { NONE, ACCEPT, RECV, SEND };
 
 template <size_t BufferSize>
@@ -10,10 +12,6 @@ struct OverlappedEx {
 	Task taskType_ = Task::NONE;
 	WSABUF wsaBuf_ = {};
 	char buffer_[BufferSize] = {};
-
-	void Reset() {
-		overlapped_ = {};
-		taskType_ = Task::NONE;
-		wsaBuf_ = {};
-	}
+	size_t readPos_ = 0;
+	size_t writePos_ = 0;
 };

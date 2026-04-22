@@ -12,6 +12,8 @@ class PoolElement : public std::enable_shared_from_this<T> {
 	void Capture() { selfPtr_ = this->shared_from_this(); }
 	void Release() { selfPtr_ = nullptr; }
 
+	size_t poolIndex;
+
    private:
 	std::shared_ptr<T> selfPtr_ = nullptr;
 };

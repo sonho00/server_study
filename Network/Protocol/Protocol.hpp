@@ -2,44 +2,38 @@
 
 #include <cstdint>
 
-enum class PacketID : uint16_t {
-	NONE,
-	C2S_MOVE,
-	S2C_MOVE,
-	C2S_CHAT,
-	S2C_CHAT,
-	ID_MAX
-};
+enum class C2S_PACKET_ID : uint16_t { NONE, MOVE, CHAT, CNT };
+enum class S2C_PACKET_ID : uint16_t { NONE, MOVE, CHAT, CNT };
 
 #pragma pack(push, 1)
 
-struct PacketHeader {
+struct PACKET_HEADER {
 	uint16_t size;
-	PacketID id;
+	C2S_PACKET_ID id;
 };
 
-struct C2S_MOVE {
-	PacketHeader header;
+struct PACKET {
+	PACKET_HEADER header;
+};
+
+struct C2S_MOVE : PACKET {
 	float x;
 	float y;
 };
 
-struct S2C_MOVE {
-	PacketHeader header;
-	int sessionId;
+struct S2C_MOVE : PACKET {
 	float x;
 	float y;
-};
-
-struct C2S_CHAT {
-	PacketHeader header;
-	char message[256];
-};
-
-struct S2C_CHAT {
-	PacketHeader header;
 	int sessionId;
+};
+
+struct C2S_CHAT : PACKET {
 	char message[256];
+};
+
+struct S2C_CHAT : PACKET {
+	char message[256];
+	int sessionId;
 };
 
 #pragma pack(pop)
