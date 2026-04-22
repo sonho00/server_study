@@ -2,24 +2,23 @@
 
 #include <WinSock2.h>
 #include <minwindef.h>
+#include <rpcndr.h>
 
 #include <atomic>
 #include <functional>
-#include <queue>
 
 #include "ObjectPool.hpp"
 #include "OverlappedEx.hpp"
 #include "Protocol.hpp"
 
-
 class Session : public PoolElement<Session> {
    public:
-	constexpr static size_t kReadBufferSize = 256;
-	constexpr static size_t kWriteBufferSize = 256;
+	Session(size_t readBufferSize = 1 << 16, size_t writeBufferSize = 1 << 16)
+		: readOv(readBufferSize), writeOv(writeBufferSize) {}
 
 	bool OnRead(DWORD bytesTransferred);
 	bool OnWrite(DWORD bytesTransferred);
-	bool HandleIO(OverlappedEx<kReadBufferSize>* ovEx, DWORD bytesTransferred);
+	bool HandleIO(OverlappedEx* ovEx, DWORD bytesTransferred);
 
 	bool HandleC2S_MOVE(C2S_MOVE* packet);
 	bool HandleC2S_CHAT(C2S_CHAT* packet);
@@ -28,20 +27,30 @@ class Session : public PoolElement<Session> {
 
 	void Close();
 
-	OverlappedEx<kReadBufferSize> readOv;
-	OverlappedEx<kWriteBufferSize> writeOv;
+	OverlappedEx readOv = {};
+	OverlappedEx writeOv = {};
 	SOCKET socket_ = INVALID_SOCKET;
-	std::queue<std::string> sendQueue_;
+
 	std::atomic<bool> isSending_ = false;
 
-	std::function<bool()> Handlers[static_cast<size_t>(C2S_PACKET_ID::CNT)] = {
-		[]() { return false; },
-		[this]() {
-			return HandleC2S_MOVE(
-				reinterpret_cast<C2S_MOVE*>(readOv.buffer_ + readOv.readPos_));
-		},
-		[this]() {
-			return HandleC2S_CHAT(
-				reinterpret_cast<C2S_CHAT*>(readOv.buffer_ + readOv.readPos_));
-		}};
+	std::function<bool(DWORD bytesTransferred)>
+		inputHandlers[static_cast<size_t>(Task::CNT)] = {
+			nullptr,
+			[this](DWORD bytesTransferred) { return OnRead(bytesTransferred); },
+			[this](DWORD bytesTransferred) {
+				return OnWrite(bytesTransferred);
+			}};
+
+   private:
+	std::function<bool()>
+		packetHandlers[static_cast<size_t>(C2S_PACKET_ID::CNT)] = {
+			nullptr,
+			[this]() {
+				return HandleC2S_MOVE(reinterpret_cast<C2S_MOVE*>(
+					readOv.buffer_.GetBuffer() + readOv.readPos_));
+			},
+			[this]() {
+				return HandleC2S_CHAT(reinterpret_cast<C2S_CHAT*>(
+					readOv.buffer_.GetBuffer() + readOv.readPos_));
+			}};
 };

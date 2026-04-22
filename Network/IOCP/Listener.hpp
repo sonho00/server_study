@@ -11,12 +11,11 @@ class Listener {
 		: iocpCore_(iocpCore), port_(port) {}
 
 	bool Init();
-	bool HandleAccept(OverlappedEx<Session::kReadBufferSize>* overlappedEx,
-					  DWORD bytesTransferred);
+	bool HandleAccept(OverlappedEx* overlappedEx, DWORD bytesTransferred);
 	bool PostAccept();
 
    private:
-	OverlappedEx<sizeof(sockaddr_in) + 16> acceptOv;
+	OverlappedEx acceptOv;
 	SOCKET socket_ = INVALID_SOCKET;
 
 	IocpCore* iocpCore_ = nullptr;

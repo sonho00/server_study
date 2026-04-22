@@ -17,12 +17,11 @@ class IocpCore {
 	bool Start(size_t threadCount);
 	bool Register(SOCKET socket, ULONG_PTR completionKey);
 
-	ObjectPool<Session, 16> sessionPool_;
+	ObjectPool<Session, 1024> sessionPool_;
 
    private:
 	static DWORD WINAPI WorkerThread(LPVOID lpParam);
 
-	HANDLE hIocp_;
-
 	std::vector<HANDLE> threads_;
+	HANDLE hIocp_;
 };

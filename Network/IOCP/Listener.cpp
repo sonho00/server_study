@@ -16,8 +16,8 @@ bool Listener::Init() {
 	}
 
 	acceptOv.taskType_ = Task::ACCEPT;
-	acceptOv.wsaBuf_.buf = acceptOv.buffer_;
-	acceptOv.wsaBuf_.len = sizeof(acceptOv.buffer_);
+	acceptOv.wsaBuf_.buf = acceptOv.buffer_.GetBuffer();
+	acceptOv.wsaBuf_.len = static_cast<ULONG>(acceptOv.buffer_.GetSize()) - 1;
 
 	if (!iocpCore_->Register(socket_, reinterpret_cast<ULONG_PTR>(this))) {
 		NetUtils::PrintError("Failed to register listener socket with IOCP");
@@ -27,7 +27,8 @@ bool Listener::Init() {
 	return true;
 }
 
-bool Listener::HandleAccept(OverlappedEx<Session::kReadBufferSize>* overlappedEx, DWORD bytesTransferred) {
+bool Listener::HandleAccept(OverlappedEx* overlappedEx,
+							DWORD bytesTransferred) {
 	std::cout << "Client connected." << std::endl;
 	if (!PostAccept()) {
 		NetUtils::PrintError("Failed to post accept");
@@ -43,8 +44,9 @@ bool Listener::HandleAccept(OverlappedEx<Session::kReadBufferSize>* overlappedEx
 	}
 
 	session->readOv.taskType_ = Task::RECV;
-	session->readOv.wsaBuf_.buf = session->readOv.buffer_;
-	session->readOv.wsaBuf_.len = sizeof(session->readOv.buffer_);
+	session->readOv.wsaBuf_.buf = session->readOv.buffer_.GetBuffer();
+	session->readOv.wsaBuf_.len =
+		static_cast<ULONG>(session->readOv.buffer_.GetSize()) - 1;
 	ZeroMemory(&session->readOv.overlapped_, sizeof(OVERLAPPED));
 
 	DWORD flags = 0;
@@ -75,8 +77,9 @@ bool Listener::PostAccept() {
 	}
 
 	session->readOv.taskType_ = Task::ACCEPT;
-	session->readOv.wsaBuf_.buf = session->readOv.buffer_;
-	session->readOv.wsaBuf_.len = sizeof(session->readOv.buffer_);
+	session->readOv.wsaBuf_.buf = session->readOv.buffer_.GetBuffer();
+	session->readOv.wsaBuf_.len =
+		static_cast<ULONG>(session->readOv.buffer_.GetSize()) - 1;
 	session->socket_ = hAcceptSocket;
 
 	if (!iocpCore_->Register(hAcceptSocket,
@@ -89,8 +92,8 @@ bool Listener::PostAccept() {
 	DWORD bytesReceived = 0;
 	DWORD addrLen = sizeof(sockaddr_in) + 16;
 	BOOL result = NetUtils::AcceptEx(
-		socket_, hAcceptSocket, session->readOv.buffer_, 0, addrLen, addrLen,
-		&bytesReceived, &session->readOv.overlapped_);
+		socket_, hAcceptSocket, session->readOv.buffer_.GetBuffer(), 0, addrLen,
+		addrLen, &bytesReceived, &session->readOv.overlapped_);
 
 	if (!result && WSAGetLastError() != ERROR_IO_PENDING) {
 		NetUtils::PrintError("AcceptEx failed");

@@ -73,10 +73,8 @@ DWORD WINAPI IocpCore::WorkerThread(LPVOID lpParam) {
 			GetQueuedCompletionStatus(iocp->hIocp_, &bytesTransferred,
 									  &completionKey, &pOverlapped, INFINITE);
 
-		OverlappedEx<Session::kReadBufferSize>* pOverlappedEx =
-			CONTAINING_RECORD(pOverlapped,
-							  OverlappedEx<Session::kReadBufferSize>,
-							  overlapped_);
+		OverlappedEx* pOverlappedEx =
+			CONTAINING_RECORD(pOverlapped, OverlappedEx, overlapped_);
 
 		if (!pOverlappedEx) {
 			if (result) {
@@ -124,9 +122,11 @@ DWORD WINAPI IocpCore::WorkerThread(LPVOID lpParam) {
 				continue;
 			}
 
-			if (!objPtr->HandleIO(pOverlappedEx, bytesTransferred)) {
-				NetUtils::PrintError("Failed to handle I/O");
+			if (!objPtr->inputHandlers[static_cast<size_t>(
+					pOverlappedEx->taskType_)](bytesTransferred)) {
+				NetUtils::PrintError("Failed to handle I/O operation");
 				objPtr->Close();
+				continue;
 			}
 		}
 	}
