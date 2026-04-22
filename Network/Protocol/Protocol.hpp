@@ -10,29 +10,29 @@ enum class S2C_PACKET_ID : uint16_t { NONE, MOVE, CHAT, CNT };
 
 struct PACKET_HEADER {
 	uint16_t size;
-	C2S_PACKET_ID id;
+	uint16_t id;
 };
 
-struct PACKET {
+struct C2S_MOVE {
 	PACKET_HEADER header;
-};
-
-struct C2S_MOVE : PACKET {
 	float x;
 	float y;
 };
 
-struct S2C_MOVE : PACKET {
+struct S2C_MOVE {
+	PACKET_HEADER header;
 	float x;
 	float y;
 	int sessionId;
 };
 
-struct C2S_CHAT : PACKET {
+struct C2S_CHAT {
+	PACKET_HEADER header;
 	char message[256];
 };
 
-struct S2C_CHAT : PACKET {
+struct S2C_CHAT {
+	PACKET_HEADER header;
 	char message[256];
 	int sessionId;
 };

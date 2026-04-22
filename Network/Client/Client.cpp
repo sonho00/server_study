@@ -43,7 +43,7 @@ int main() {
 	std::cout << "Connected to echo server." << std::endl;
 
 	C2S_CHAT chatPacket;
-	chatPacket.header.id = C2S_PACKET_ID::CHAT;
+	chatPacket.header.id = static_cast<uint16_t>(C2S_PACKET_ID::CHAT);
 	chatPacket.header.size =
 		sizeof(PACKET_HEADER) + sizeof("Hello, Echo Server!");
 	strcpy_s(chatPacket.message, sizeof(chatPacket.message),
