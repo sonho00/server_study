@@ -26,43 +26,10 @@ bool HandleC2S_CHAT(Session* session, void* packet) {
 		return false;
 	}
 
-	// 클라이언트에게 에코 메시지 보내기
-
-	size_t availableData =
-		(session->writeOv.writePos_ - session->writeOv.readPos_) &
-		(session->writeOv.buffer_.GetSize() - 1);
-
-	PACKET_HEADER* header = reinterpret_cast<PACKET_HEADER*>(packet);
-	if (availableData + header->size >= session->writeOv.buffer_.GetSize()) {
-		NetUtils::PrintError("Write buffer overflow");
+	if (!session->RegisterWrite(packet, chatPacket->header.size)) {
+		NetUtils::PrintError("Failed to post write for C2S_CHAT packet");
 		session->Close();
 		return false;
-	}
-
-	memmove(session->writeOv.buffer_.GetBuffer() + session->writeOv.writePos_,
-			packet, header->size);
-	session->writeOv.writePos_ = (session->writeOv.writePos_ + header->size) &
-								 (session->writeOv.buffer_.GetSize() - 1);
-
-	if (!session->isSending_) {
-		session->isSending_ = true;
-		session->writeOv.ioType_ = IO_TYPE::SEND;
-		session->writeOv.wsaBuf_.buf =
-			session->writeOv.buffer_.GetBuffer() + session->writeOv.readPos_;
-		session->writeOv.wsaBuf_.len = static_cast<ULONG>(
-			(session->writeOv.writePos_ - session->writeOv.readPos_) &
-			(session->writeOv.buffer_.GetSize() - 1));
-		ZeroMemory(&session->writeOv.overlapped_, sizeof(OVERLAPPED));
-		DWORD flags = 0;
-		int sendResult =
-			WSASend(session->socket_, &session->writeOv.wsaBuf_, 1, NULL, flags,
-					&session->writeOv.overlapped_, NULL);
-		if (sendResult == SOCKET_ERROR &&
-			WSAGetLastError() != ERROR_IO_PENDING) {
-			NetUtils::PrintError("WSASend failed");
-			session->Close();
-			return false;
-		}
 	}
 
 	return true;

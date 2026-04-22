@@ -10,13 +10,68 @@
 #include "Network/Server/PacketHandler.hpp"
 #include "OverlappedEx.hpp"
 
+bool Session::RegisterRead() {
+	readOv.ioType_ = IO_TYPE::RECV;
+	readOv.wsaBuf_.buf = readOv.buffer_.GetBuffer() + readOv.writePos_;
+	readOv.wsaBuf_.len = readOv.buffer_.GetSize() - readOv.writePos_;
+	ZeroMemory(&readOv.overlapped_, sizeof(OVERLAPPED));
+	DWORD flags = 0;
+	int recvResult = WSARecv(socket_, &readOv.wsaBuf_, 1, NULL, &flags,
+							 &readOv.overlapped_, NULL);
+
+	if (recvResult == SOCKET_ERROR) {
+		int errorCode = WSAGetLastError();
+		if (errorCode != ERROR_IO_PENDING) {
+			NetUtils::PrintError("WSARecv failed", errorCode);
+			Close();
+			return false;
+		}
+	}
+
+	return true;
+}
+
+bool Session::RegisterWrite(void* packet, size_t packetSize) {
+	if (writeOv.writePos_ - writeOv.readPos_ + packetSize >
+		writeOv.buffer_.GetSize()) {
+		NetUtils::PrintError("Write buffer overflow");
+		return false;
+	}
+
+	memcpy(writeOv.buffer_.GetBuffer() + writeOv.writePos_, packet, packetSize);
+	writeOv.writePos_ += packetSize;
+
+	if (isSending_) return true;
+	isSending_ = true;
+
+	writeOv.ioType_ = IO_TYPE::SEND;
+	writeOv.wsaBuf_.buf = writeOv.buffer_.GetBuffer() + writeOv.readPos_;
+	writeOv.wsaBuf_.len =
+		static_cast<ULONG>(writeOv.writePos_ - writeOv.readPos_);
+	ZeroMemory(&writeOv.overlapped_, sizeof(OVERLAPPED));
+	DWORD flags = 0;
+	int sendResult = WSASend(socket_, &writeOv.wsaBuf_, 1, NULL, flags,
+							 &writeOv.overlapped_, NULL);
+
+	if (sendResult == SOCKET_ERROR) {
+		int errorCode = WSAGetLastError();
+		if (errorCode != ERROR_IO_PENDING) {
+			NetUtils::PrintError("WSASend failed", errorCode);
+			Close();
+			return false;
+		}
+	}
+
+	return true;
+}
+
 bool Session::OnRead(DWORD bytesTransferred) {
-	readOv.writePos_ =
-		(readOv.writePos_ + bytesTransferred) & (readOv.buffer_.GetSize() - 1);
+	std::cout << "Received " << bytesTransferred << " bytes." << std::endl;
+
+	readOv.writePos_ += bytesTransferred;
 
 	while (true) {
-		size_t avilableData = (readOv.writePos_ - readOv.readPos_) &
-							  (readOv.buffer_.GetSize() - 1);
+		size_t avilableData = readOv.writePos_ - readOv.readPos_;
 		if (avilableData < sizeof(PACKET_HEADER)) break;
 
 		PACKET_HEADER* header = reinterpret_cast<PACKET_HEADER*>(
@@ -32,7 +87,6 @@ bool Session::OnRead(DWORD bytesTransferred) {
 
 		if (!PacketHandler::Execute(
 				this, readOv.buffer_.GetBuffer() + readOv.readPos_)) {
-			std::cout << header->size << std::endl;
 			NetUtils::PrintError(
 				("Failed to handle packet with ID: " +
 				 std::to_string(static_cast<uint16_t>(header->id)))
@@ -41,30 +95,16 @@ bool Session::OnRead(DWORD bytesTransferred) {
 			return false;
 		}
 
-		std::cout << "Received message from client: "
-				  << std::string(readOv.buffer_.GetBuffer() + readOv.readPos_,
-								 header->size)
-				  << std::endl;
-
 		readOv.readPos_ += header->size;
 	}
 
-	if (readOv.readPos_ == readOv.writePos_) {
-		readOv.readPos_ = 0;
-		readOv.writePos_ = 0;
+	if (readOv.readPos_ >= readOv.buffer_.GetSize()) {
+		readOv.readPos_ -= readOv.buffer_.GetSize();
+		readOv.writePos_ -= readOv.buffer_.GetSize();
 	}
 
-	readOv.wsaBuf_.buf = readOv.buffer_.GetBuffer() + readOv.writePos_;
-	readOv.wsaBuf_.len = (writeOv.readPos_ - writeOv.writePos_ - 1) &
-						 (writeOv.buffer_.GetSize() - 1);
-	ZeroMemory(&readOv.overlapped_, sizeof(OVERLAPPED));
-	DWORD flags = 0;
-	int recvResult = WSARecv(socket_, &readOv.wsaBuf_, 1, NULL, &flags,
-							 &readOv.overlapped_, NULL);
-
-	if (recvResult == SOCKET_ERROR && WSAGetLastError() != ERROR_IO_PENDING) {
-		NetUtils::PrintError("WSARecv failed");
-		Close();
+	if (!RegisterRead()) {
+		NetUtils::PrintError("Failed to post another read");
 		return false;
 	}
 
@@ -72,32 +112,24 @@ bool Session::OnRead(DWORD bytesTransferred) {
 }
 
 bool Session::OnWrite(DWORD bytesTransferred) {
-	std::cout << "Sent message to client: "
-			  << std::string(writeOv.buffer_.GetBuffer(), bytesTransferred)
-			  << std::endl;
+	std::cout << "Sent " << bytesTransferred << " bytes." << std::endl;
 
-	writeOv.readPos_ =
-		(writeOv.readPos_ + bytesTransferred) & (writeOv.buffer_.GetSize() - 1);
+	writeOv.readPos_ += bytesTransferred;
 
-	size_t availableData = (writeOv.writePos_ - writeOv.readPos_) &
-						   (writeOv.buffer_.GetSize() - 1);
+	if (writeOv.readPos_ >= writeOv.buffer_.GetSize()) {
+		writeOv.readPos_ -= writeOv.buffer_.GetSize();
+		writeOv.writePos_ -= writeOv.buffer_.GetSize();
+	}
 
+	size_t availableData = writeOv.writePos_ - writeOv.readPos_;
 	if (availableData == 0) {
 		isSending_ = false;
 		return true;
 	}
 
-	writeOv.ioType_ = IO_TYPE::SEND;
-	writeOv.wsaBuf_.buf = writeOv.buffer_.GetBuffer() + writeOv.readPos_;
-	writeOv.wsaBuf_.len = static_cast<ULONG>(availableData);
-	ZeroMemory(&writeOv.overlapped_, sizeof(OVERLAPPED));
-	DWORD flags = 0;
-	int sendResult = WSASend(socket_, &writeOv.wsaBuf_, 1, NULL, flags,
-							 &writeOv.overlapped_, NULL);
-
-	if (sendResult == SOCKET_ERROR && WSAGetLastError() != ERROR_IO_PENDING) {
-		NetUtils::PrintError("WSASend failed");
-		Close();
+	if (!RegisterWrite(writeOv.buffer_.GetBuffer() + writeOv.readPos_,
+					   availableData)) {
+		NetUtils::PrintError("Failed to post another write");
 		return false;
 	}
 

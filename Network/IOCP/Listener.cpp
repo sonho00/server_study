@@ -31,6 +31,7 @@ bool Listener::Init() {
 bool Listener::HandleAccept(OverlappedEx* overlappedEx,
 							DWORD bytesTransferred) {
 	std::cout << "Client connected." << std::endl;
+
 	if (!PostAccept()) {
 		NetUtils::PrintError("Failed to post accept");
 		return false;
@@ -44,18 +45,9 @@ bool Listener::HandleAccept(OverlappedEx* overlappedEx,
 		return false;
 	}
 
-	session->readOv.ioType_ = IO_TYPE::RECV;
-	session->readOv.wsaBuf_.buf = session->readOv.buffer_.GetBuffer();
-	session->readOv.wsaBuf_.len =
-		static_cast<ULONG>(session->readOv.buffer_.GetSize()) - 1;
-	ZeroMemory(&session->readOv.overlapped_, sizeof(OVERLAPPED));
-
-	DWORD flags = 0;
-	int recvResult = WSARecv(session->socket_, &session->readOv.wsaBuf_, 1,
-							 NULL, &flags, &session->readOv.overlapped_, NULL);
-
-	if (recvResult == SOCKET_ERROR && WSAGetLastError() != ERROR_IO_PENDING) {
-		NetUtils::PrintError("WSARecv failed");
+	if (!session->RegisterRead()) {
+		NetUtils::PrintError("Failed to post initial read");
+		session->Close();
 		return false;
 	}
 
@@ -73,14 +65,13 @@ bool Listener::PostAccept() {
 	std::shared_ptr<Session> session = iocpCore_->sessionPool_.Acquire();
 	if (!session) {
 		NetUtils::PrintError("Failed to get session from pool");
-		session->Close();
 		return false;
 	}
 
 	session->readOv.ioType_ = IO_TYPE::ACCEPT;
 	session->readOv.wsaBuf_.buf = session->readOv.buffer_.GetBuffer();
 	session->readOv.wsaBuf_.len =
-		static_cast<ULONG>(session->readOv.buffer_.GetSize()) - 1;
+		static_cast<ULONG>(session->readOv.buffer_.GetSize());
 	session->socket_ = hAcceptSocket;
 
 	if (!iocpCore_->Register(hAcceptSocket,

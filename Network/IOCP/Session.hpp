@@ -14,6 +14,9 @@ class Session : public PoolElement<Session> {
 	Session(size_t readBufferSize = 1 << 16, size_t writeBufferSize = 1 << 16)
 		: readOv(readBufferSize), writeOv(writeBufferSize) {}
 
+	bool RegisterRead();
+	bool RegisterWrite(void* packet, size_t packetSize);
+
 	bool OnRead(DWORD bytesTransferred);
 	bool OnWrite(DWORD bytesTransferred);
 	bool HandleIO(OverlappedEx* ovEx, DWORD bytesTransferred);
