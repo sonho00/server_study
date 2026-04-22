@@ -5,7 +5,7 @@
 #include <memory>
 
 #include "Listener.hpp"
-#include "NetUtils.hpp"
+#include "Network/Common/NetUtils.hpp"
 #include "OverlappedEx.hpp"
 #include "Session.hpp"
 

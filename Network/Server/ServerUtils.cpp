@@ -1,8 +1,10 @@
-#include "NetUtils.hpp"
+#include "ServerUtils.hpp"
 
 #include <WinSock2.h>
 
-namespace NetUtils {
+#include "Network/Common/NetUtils.hpp"
+
+namespace ServerUtils {
 NetFuncs::NetFuncs() {
 	SOCKET dummySocket = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, NULL, 0,
 								   WSA_FLAG_OVERLAPPED);
@@ -29,7 +31,7 @@ SOCKET CreateListenSocket(USHORT port) {
 	SOCKET listenSocket = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, NULL, 0,
 									WSA_FLAG_OVERLAPPED);
 	if (listenSocket == INVALID_SOCKET) {
-		PrintError("WSASocket failed");
+		NetUtils::PrintError("WSASocket failed");
 		return INVALID_SOCKET;
 	}
 
@@ -40,17 +42,17 @@ SOCKET CreateListenSocket(USHORT port) {
 
 	if (bind(listenSocket, reinterpret_cast<sockaddr*>(&serverAddr),
 			 sizeof(serverAddr)) == SOCKET_ERROR) {
-		PrintError("bind failed");
+		NetUtils::PrintError("bind failed");
 		closesocket(listenSocket);
 		return INVALID_SOCKET;
 	}
 
 	if (listen(listenSocket, SOMAXCONN) == SOCKET_ERROR) {
-		PrintError("listen failed");
+		NetUtils::PrintError("listen failed");
 		closesocket(listenSocket);
 		return INVALID_SOCKET;
 	}
 
 	return listenSocket;
 }
-}  // namespace NetUtils
+}  // namespace ServerUtils

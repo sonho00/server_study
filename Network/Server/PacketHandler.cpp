@@ -2,16 +2,23 @@
 
 #include <iostream>
 
-#include "Network/IOCP/NetUtils.hpp"
-#include "Network/IOCP/Session.hpp"
+#include "Network/Common/NetUtils.hpp"
+#include "Session.hpp"
 
 namespace PacketHandler {
 bool HandleC2S_MOVE(Session* session, void* packet) {
 	C2S_MOVE* movePacket = reinterpret_cast<C2S_MOVE*>(packet);
-	std::cout << "Handling C2S_MOVE packet: x=" << movePacket->x
-			  << ", y=" << movePacket->y << std::endl;
+	std::cout << "Session " << session->socket_
+			  << " handling C2S_MOVE packet: x=" << movePacket->x
+			  << " y=" << movePacket->y << std::endl;
 	if (!session->Broadcast(packet)) {
 		NetUtils::PrintError("Failed to broadcast C2S_MOVE packet");
+		return false;
+	}
+
+	if (!session->RegisterWrite(packet, movePacket->header.size)) {
+		NetUtils::PrintError("Failed to post write for C2S_MOVE packet");
+		session->Close();
 		return false;
 	}
 	return true;
@@ -19,7 +26,8 @@ bool HandleC2S_MOVE(Session* session, void* packet) {
 
 bool HandleC2S_CHAT(Session* session, void* packet) {
 	C2S_CHAT* chatPacket = reinterpret_cast<C2S_CHAT*>(packet);
-	std::cout << "Handling C2S_CHAT packet: message=" << chatPacket->message
+	std::cout << "Session " << session->socket_
+			  << " handling C2S_CHAT packet: message=" << chatPacket->message
 			  << std::endl;
 	if (!session->Broadcast(packet)) {
 		NetUtils::PrintError("Failed to broadcast C2S_CHAT packet");

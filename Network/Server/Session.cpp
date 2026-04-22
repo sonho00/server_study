@@ -6,9 +6,9 @@
 #include <iostream>
 #include <string>
 
-#include "NetUtils.hpp"
-#include "Network/Server/PacketHandler.hpp"
+#include "Network/Common/NetUtils.hpp"
 #include "OverlappedEx.hpp"
+#include "PacketHandler.hpp"
 
 bool Session::RegisterRead() {
 	readOv.ioType_ = IO_TYPE::RECV;
@@ -66,7 +66,8 @@ bool Session::RegisterWrite(void* packet, size_t packetSize) {
 }
 
 bool Session::OnRead(DWORD bytesTransferred) {
-	std::cout << "Received " << bytesTransferred << " bytes." << std::endl;
+	std::cout << "Session " << socket_ << " received " << bytesTransferred
+			  << " bytes." << std::endl;
 
 	readOv.writePos_ += bytesTransferred;
 
@@ -112,7 +113,8 @@ bool Session::OnRead(DWORD bytesTransferred) {
 }
 
 bool Session::OnWrite(DWORD bytesTransferred) {
-	std::cout << "Sent " << bytesTransferred << " bytes." << std::endl;
+	std::cout << "Session " << socket_ << " sent " << bytesTransferred
+			  << " bytes." << std::endl;
 
 	writeOv.readPos_ += bytesTransferred;
 

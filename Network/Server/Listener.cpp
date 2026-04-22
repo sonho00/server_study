@@ -5,13 +5,14 @@
 #include <iostream>
 
 #include "IocpCore.hpp"
-#include "NetUtils.hpp"
+#include "Network/Common/NetUtils.hpp"
 #include "OverlappedEx.hpp"
+#include "ServerUtils.hpp"
 #include "Session.hpp"
 
 Listener::Listener(IocpCore* iocpCore, uint16_t port, LPFN_ACCEPTEX acceptEx)
 	: iocpCore_(iocpCore), port_(port), acceptEx_(acceptEx) {
-	socket_ = NetUtils::CreateListenSocket(port_);
+	socket_ = ServerUtils::CreateListenSocket(port_);
 	if (socket_ == INVALID_SOCKET) {
 		throw std::runtime_error("Failed to create listen socket");
 	}

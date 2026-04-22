@@ -1,6 +1,6 @@
 #include <iostream>
 
-#include "Network/Server/ServerService.hpp"
+#include "ServerService.hpp"
 
 #pragma comment(lib, "ws2_32.lib")
 

@@ -2,8 +2,8 @@
 
 #include <WinSock2.h>
 
-#include "MagicBuffer.hpp"
-#include "Network/Protocol/Protocol.hpp"
+#include "Network/Common/MagicBuffer.hpp"
+#include "Network/Common/Protocol.hpp"
 
 struct OverlappedEx {
 	OverlappedEx(size_t bufferSize = 1 << 16)

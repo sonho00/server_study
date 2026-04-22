@@ -2,12 +2,13 @@
 
 #include <thread>
 
-#include "Network/IOCP/IocpCore.hpp"
-#include "Network/IOCP/Listener.hpp"
-#include "Network/IOCP/NetUtils.hpp"
-#include "Network/IOCP/ObjectPool.hpp"
-#include "Network/IOCP/Session.hpp"
-#include "Network/IOCP/WSAManager.hpp"
+#include "IocpCore.hpp"
+#include "Listener.hpp"
+#include "Network/Common/NetUtils.hpp"
+#include "Network/Common/ObjectPool.hpp"
+#include "Network/Common/WSAManager.hpp"
+#include "ServerUtils.hpp"
+#include "Session.hpp"
 
 class ServerService {
    public:
@@ -27,7 +28,7 @@ class ServerService {
 
    private:
 	WSAManager wsaManager_;
-	NetUtils::NetFuncs netFuncs_;
+	ServerUtils::NetFuncs netFuncs_;
 	std::unique_ptr<IocpCore> iocpCore_;
 	ObjectPool<Session> sessionManager_;
 	Listener listener_;

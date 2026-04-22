@@ -5,8 +5,8 @@
 #include <atomic>
 #include <functional>
 
-#include "Network/Protocol/Protocol.hpp"
-#include "ObjectPool.hpp"
+#include "Network/Common/ObjectPool.hpp"
+#include "Network/Common/Protocol.hpp"
 #include "OverlappedEx.hpp"
 
 class Session : public PoolElement<Session> {

@@ -2,7 +2,7 @@ CXX = g++
 CXXFLAGS= -I. -std=c++20 -O3 -Wall -Wextra
 LDFLAGS = -lws2_32
 
-SRCS = $(wildcard Network/IOCP/*.cpp) $(wildcard Network/Server/*.cpp)
+SRCS = $(wildcard Network/Common/*.cpp) $(wildcard Network/Server/*.cpp)
 TARGETS = bin/Server.exe bin/Client.exe
 
 all: $(TARGETS)

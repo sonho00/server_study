@@ -2,7 +2,7 @@
 
 #include <stdexcept>
 
-#include "Network/IOCP/NetUtils.hpp"
+#include "Network/Common/NetUtils.hpp"
 
 MagicBuffer::MagicBuffer(size_t size) : size_(size) {
 	SYSTEM_INFO sysInfo;
