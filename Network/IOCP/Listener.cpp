@@ -4,6 +4,7 @@
 
 #include <iostream>
 
+#include "IocpCore.hpp"
 #include "NetUtils.hpp"
 #include "OverlappedEx.hpp"
 #include "Session.hpp"
@@ -15,7 +16,7 @@ bool Listener::Init() {
 		return false;
 	}
 
-	acceptOv.taskType_ = Task::ACCEPT;
+	acceptOv.ioType_ = IO_TYPE::ACCEPT;
 	acceptOv.wsaBuf_.buf = acceptOv.buffer_.GetBuffer();
 	acceptOv.wsaBuf_.len = static_cast<ULONG>(acceptOv.buffer_.GetSize()) - 1;
 
@@ -43,7 +44,7 @@ bool Listener::HandleAccept(OverlappedEx* overlappedEx,
 		return false;
 	}
 
-	session->readOv.taskType_ = Task::RECV;
+	session->readOv.ioType_ = IO_TYPE::RECV;
 	session->readOv.wsaBuf_.buf = session->readOv.buffer_.GetBuffer();
 	session->readOv.wsaBuf_.len =
 		static_cast<ULONG>(session->readOv.buffer_.GetSize()) - 1;
@@ -69,14 +70,14 @@ bool Listener::PostAccept() {
 		return false;
 	}
 
-	std::shared_ptr<Session> session = iocpCore_->sessionPool_.Pop();
+	std::shared_ptr<Session> session = iocpCore_->sessionPool_.Acquire();
 	if (!session) {
 		NetUtils::PrintError("Failed to get session from pool");
 		session->Close();
 		return false;
 	}
 
-	session->readOv.taskType_ = Task::ACCEPT;
+	session->readOv.ioType_ = IO_TYPE::ACCEPT;
 	session->readOv.wsaBuf_.buf = session->readOv.buffer_.GetBuffer();
 	session->readOv.wsaBuf_.len =
 		static_cast<ULONG>(session->readOv.buffer_.GetSize()) - 1;

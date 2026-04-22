@@ -1,16 +1,14 @@
 #include "Session.hpp"
 
 #include <WinSock2.h>
-#include <minwinbase.h>
-#include <minwindef.h>
 
 #include <cstring>
 #include <iostream>
 #include <string>
 
 #include "NetUtils.hpp"
+#include "Network/Server/PacketHandler.hpp"
 #include "OverlappedEx.hpp"
-#include "Protocol.hpp"
 
 bool Session::OnRead(DWORD bytesTransferred) {
 	readOv.writePos_ =
@@ -32,7 +30,8 @@ bool Session::OnRead(DWORD bytesTransferred) {
 
 		if (avilableData < header->size) break;
 
-		if (!packetHandlers[static_cast<size_t>(header->id)]()) {
+		if (!PacketHandler::Execute(
+				this, readOv.buffer_.GetBuffer() + readOv.readPos_)) {
 			std::cout << header->size << std::endl;
 			NetUtils::PrintError(
 				("Failed to handle packet with ID: " +
@@ -88,7 +87,7 @@ bool Session::OnWrite(DWORD bytesTransferred) {
 		return true;
 	}
 
-	writeOv.taskType_ = Task::SEND;
+	writeOv.ioType_ = IO_TYPE::SEND;
 	writeOv.wsaBuf_.buf = writeOv.buffer_.GetBuffer() + writeOv.readPos_;
 	writeOv.wsaBuf_.len = static_cast<ULONG>(availableData);
 	ZeroMemory(&writeOv.overlapped_, sizeof(OVERLAPPED));
@@ -105,64 +104,7 @@ bool Session::OnWrite(DWORD bytesTransferred) {
 	return true;
 }
 
-bool Session::HandleC2S_MOVE(C2S_MOVE* packet) {
-	std::cout << "Handling C2S_MOVE packet: x=" << packet->x
-			  << ", y=" << packet->y << std::endl;
-	if (!Broadcast(packet)) {
-		NetUtils::PrintError("Failed to broadcast C2S_MOVE packet");
-		return false;
-	}
-	return true;
-}
-
-bool Session::HandleC2S_CHAT(C2S_CHAT* packet) {
-	std::cout << "Handling C2S_CHAT packet: message=" << packet->message
-			  << std::endl;
-	if (!Broadcast(packet)) {
-		NetUtils::PrintError("Failed to broadcast C2S_CHAT packet");
-		return false;
-	}
-
-	// 클라이언트에게 에코 메시지 보내기
-
-	size_t availableData = (writeOv.writePos_ - writeOv.readPos_) &
-						   (writeOv.buffer_.GetSize() - 1);
-
-	PACKET_HEADER* header = reinterpret_cast<PACKET_HEADER*>(packet);
-	if (availableData + header->size >= writeOv.buffer_.GetSize()) {
-		NetUtils::PrintError("Write buffer overflow");
-		Close();
-		return false;
-	}
-
-	memmove(writeOv.buffer_.GetBuffer() + writeOv.writePos_, packet,
-			header->size);
-	writeOv.writePos_ =
-		(writeOv.writePos_ + header->size) & (writeOv.buffer_.GetSize() - 1);
-
-	if (!isSending_) {
-		isSending_ = true;
-		writeOv.taskType_ = Task::SEND;
-		writeOv.wsaBuf_.buf = writeOv.buffer_.GetBuffer() + writeOv.readPos_;
-		writeOv.wsaBuf_.len =
-			static_cast<ULONG>((writeOv.writePos_ - writeOv.readPos_) &
-							   (writeOv.buffer_.GetSize() - 1));
-		ZeroMemory(&writeOv.overlapped_, sizeof(OVERLAPPED));
-		DWORD flags = 0;
-		int sendResult = WSASend(socket_, &writeOv.wsaBuf_, 1, NULL, flags,
-								 &writeOv.overlapped_, NULL);
-		if (sendResult == SOCKET_ERROR &&
-			WSAGetLastError() != ERROR_IO_PENDING) {
-			NetUtils::PrintError("WSASend failed");
-			Close();
-			return false;
-		}
-	}
-
-	return true;
-}
-
-bool Session::Broadcast(PACKET* packet) { return true; }
+bool Session::Broadcast(void* packet) { return true; }
 
 void Session::Close() {
 	if (socket_ != INVALID_SOCKET) {

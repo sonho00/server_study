@@ -2,6 +2,7 @@
 
 #include <cstdint>
 
+enum class IO_TYPE { NONE, RECV, SEND, ACCEPT, CNT };
 enum class C2S_PACKET_ID : uint16_t { NONE, MOVE, CHAT, CNT };
 enum class S2C_PACKET_ID : uint16_t { NONE, MOVE, CHAT, CNT };
 

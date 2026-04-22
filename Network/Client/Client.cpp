@@ -4,7 +4,7 @@
 #include <iostream>
 #include <thread>
 
-#include "Protocol.hpp"
+#include "Network/Protocol/Protocol.hpp"
 
 #pragma comment(lib, "ws2_32.lib")
 

@@ -1,7 +1,6 @@
 #pragma once
 
 #include <WinSock2.h>
-#include <mswsock.h>
 
 #include <vector>
 

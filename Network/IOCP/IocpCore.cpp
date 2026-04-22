@@ -1,7 +1,6 @@
 #include "IocpCore.hpp"
 
 #include <WinSock2.h>
-#include <basetsd.h>
 
 #include <memory>
 
@@ -93,7 +92,7 @@ DWORD WINAPI IocpCore::WorkerThread(LPVOID lpParam) {
 				break;
 			}
 
-			if (pOverlappedEx->taskType_ == Task::ACCEPT) {
+			if (pOverlappedEx->ioType_ == IO_TYPE::ACCEPT) {
 				NetUtils::PrintError("Accept operation failed");
 			} else {
 				NetUtils::PrintError("I/O operation failed");
@@ -106,7 +105,7 @@ DWORD WINAPI IocpCore::WorkerThread(LPVOID lpParam) {
 			continue;
 		}
 
-		if (pOverlappedEx->taskType_ == Task::ACCEPT) {
+		if (pOverlappedEx->ioType_ == IO_TYPE::ACCEPT) {
 			Listener* listener = reinterpret_cast<Listener*>(completionKey);
 			if (!listener->HandleAccept(pOverlappedEx, bytesTransferred)) {
 				NetUtils::PrintError("Failed to handle accept");
@@ -123,7 +122,7 @@ DWORD WINAPI IocpCore::WorkerThread(LPVOID lpParam) {
 			}
 
 			if (!objPtr->inputHandlers[static_cast<size_t>(
-					pOverlappedEx->taskType_)](bytesTransferred)) {
+					pOverlappedEx->ioType_)](bytesTransferred)) {
 				NetUtils::PrintError("Failed to handle I/O operation");
 				objPtr->Close();
 				continue;

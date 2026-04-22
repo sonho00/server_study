@@ -5,10 +5,10 @@
 #include <iostream>
 #include <thread>
 
-#include "IocpCore.hpp"
-#include "Listener.hpp"
-#include "NetUtils.hpp"
-#include "WSAManager.hpp"
+#include "Network/IOCP/IocpCore.hpp"
+#include "Network/IOCP/Listener.hpp"
+#include "Network/IOCP/NetUtils.hpp"
+#include "Network/IOCP/WSAManager.hpp"
 
 #pragma comment(lib, "ws2_32.lib")
 

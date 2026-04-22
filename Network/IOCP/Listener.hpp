@@ -2,8 +2,9 @@
 
 #include <WinSock2.h>
 
-#include "IocpCore.hpp"
 #include "OverlappedEx.hpp"
+
+class IocpCore;
 
 class Listener {
    public:
