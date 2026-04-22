@@ -9,10 +9,9 @@
 
 class IocpCore {
    public:
-	IocpCore() = default;
+	IocpCore();
 	~IocpCore();
 
-	bool Init();
 	bool Start(size_t threadCount);
 	bool Register(SOCKET socket, ULONG_PTR completionKey);
 

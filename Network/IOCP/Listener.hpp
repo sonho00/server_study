@@ -1,6 +1,7 @@
 #pragma once
 
 #include <WinSock2.h>
+#include <mswsock.h>
 
 #include "OverlappedEx.hpp"
 
@@ -8,10 +9,9 @@ class IocpCore;
 
 class Listener {
    public:
-	Listener(IocpCore* iocpCore, unsigned short port)
-		: iocpCore_(iocpCore), port_(port) {}
+	Listener(IocpCore* iocpCore, unsigned short port, LPFN_ACCEPTEX acceptEx);
+	~Listener();
 
-	bool Init();
 	bool HandleAccept(OverlappedEx* overlappedEx, DWORD bytesTransferred);
 	bool PostAccept();
 
@@ -21,4 +21,5 @@ class Listener {
 
 	IocpCore* iocpCore_ = nullptr;
 	unsigned short port_ = 0;
+	LPFN_ACCEPTEX acceptEx_ = nullptr;
 };

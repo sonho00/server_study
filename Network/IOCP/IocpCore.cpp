@@ -9,6 +9,13 @@
 #include "OverlappedEx.hpp"
 #include "Session.hpp"
 
+IocpCore::IocpCore() {
+	hIocp_ = CreateIoCompletionPort(INVALID_HANDLE_VALUE, nullptr, 0, 0);
+	if (hIocp_ == nullptr) {
+		throw std::runtime_error("Failed to create IOCP");
+	}
+}
+
 IocpCore::~IocpCore() {
 	for (HANDLE thread : threads_) {
 		if (thread) {
@@ -24,16 +31,6 @@ IocpCore::~IocpCore() {
 	}
 
 	CloseHandle(hIocp_);
-}
-
-bool IocpCore::Init() {
-	hIocp_ = CreateIoCompletionPort(INVALID_HANDLE_VALUE, nullptr, 0, 0);
-	if (hIocp_ == nullptr) {
-		NetUtils::PrintError("Failed to create IOCP");
-		return false;
-	}
-
-	return true;
 }
 
 bool IocpCore::Start(size_t threadCount) {

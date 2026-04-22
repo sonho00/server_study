@@ -9,11 +9,11 @@
 #include "OverlappedEx.hpp"
 #include "Session.hpp"
 
-bool Listener::Init() {
+Listener::Listener(IocpCore* iocpCore, uint16_t port, LPFN_ACCEPTEX acceptEx)
+	: iocpCore_(iocpCore), port_(port), acceptEx_(acceptEx) {
 	socket_ = NetUtils::CreateListenSocket(port_);
 	if (socket_ == INVALID_SOCKET) {
-		NetUtils::PrintError("Failed to create listen socket");
-		return false;
+		throw std::runtime_error("Failed to create listen socket");
 	}
 
 	acceptOv.ioType_ = IO_TYPE::ACCEPT;
@@ -21,11 +21,16 @@ bool Listener::Init() {
 	acceptOv.wsaBuf_.len = static_cast<ULONG>(acceptOv.buffer_.GetSize()) - 1;
 
 	if (!iocpCore_->Register(socket_, reinterpret_cast<ULONG_PTR>(this))) {
-		NetUtils::PrintError("Failed to register listener socket with IOCP");
-		return false;
+		throw std::runtime_error(
+			"Failed to register listener socket with IOCP");
 	}
+}
 
-	return true;
+Listener::~Listener() {
+	if (socket_ != INVALID_SOCKET) {
+		closesocket(socket_);
+		socket_ = INVALID_SOCKET;
+	}
 }
 
 bool Listener::HandleAccept(OverlappedEx* overlappedEx,
@@ -83,7 +88,7 @@ bool Listener::PostAccept() {
 
 	DWORD bytesReceived = 0;
 	DWORD addrLen = sizeof(sockaddr_in) + 16;
-	BOOL result = NetUtils::AcceptEx(
+	BOOL result = acceptEx_(
 		socket_, hAcceptSocket, session->readOv.buffer_.GetBuffer(), 0, addrLen,
 		addrLen, &bytesReceived, &session->readOv.overlapped_);
 
