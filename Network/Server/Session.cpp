@@ -86,8 +86,7 @@ bool Session::OnRead(DWORD bytesTransferred) {
 
 		if (avilableData < header->size) break;
 
-		if (!PacketHandler::Execute(
-				this, readOv.buffer_.GetBuffer() + readOv.readPos_)) {
+		if (!PacketHandler::Execute(this, header)) {
 			NetUtils::PrintError(
 				("Failed to handle packet with ID: " +
 				 std::to_string(static_cast<uint16_t>(header->id)))
