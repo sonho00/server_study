@@ -4,41 +4,22 @@
 #include <iostream>
 #include <thread>
 
-#include "Network/Protocol/Protocol.hpp"
+#include "ClientNetwork.hpp"
+#include "Network/Common/Protocol.hpp"
+#include "Network/Common/WSAManager.hpp"
 
 #pragma comment(lib, "ws2_32.lib")
 
 int main() {
 	std::cout << "Starting echo client..." << std::endl;
 
-	WSAData wsaData;
-	if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
-		std::cerr << "WSAStartup failed: " << WSAGetLastError() << std::endl;
-		return 1;
-	}
+	WSAManager wsaManager;
 
 	std::cout << "Echo client started." << std::endl;
 
-	SOCKET clientSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-	if (clientSocket == INVALID_SOCKET) {
-		std::cerr << "socket failed: " << WSAGetLastError() << std::endl;
-		WSACleanup();
-		return 1;
-	}
-
-	std::cout << "Socket created successfully." << std::endl;
-
-	sockaddr_in serverAddr;
-	serverAddr.sin_family = AF_INET;
-	InetPton(AF_INET, "127.0.0.1", &serverAddr.sin_addr);
-	serverAddr.sin_port = htons(8080);
-	if (connect(clientSocket, (sockaddr*)&serverAddr, sizeof(serverAddr)) ==
-		SOCKET_ERROR) {
-		std::cerr << "connect failed: " << WSAGetLastError() << std::endl;
-		closesocket(clientSocket);
-		WSACleanup();
-		return 1;
-	}
+	const char* serverIp = "127.0.0.1";
+	uint16_t serverPort = 8080;
+	Client client(serverIp, serverPort);
 
 	std::cout << "Connected to echo server." << std::endl;
 
@@ -49,47 +30,60 @@ int main() {
 	strcpy_s(chatPacket.message, sizeof(chatPacket.message),
 			 "Hello, Echo Server!");
 
-	std::thread thread([clientSocket, chatPacket]() {
+	C2S_MOVE movePacket;
+	movePacket.header.id = static_cast<uint16_t>(C2S_PACKET_ID::MOVE);
+	movePacket.header.size = sizeof(movePacket);
+	movePacket.x = 1.0f;
+	movePacket.y = 2.0f;
+
+	char buffer[1024];
+
+	std::thread sendThread([&client, chatPacket, movePacket]() {
 		while (true) {
-			int bytesSent =
-				send(clientSocket, reinterpret_cast<const char*>(&chatPacket),
-					 chatPacket.header.size, 0);
-			if (bytesSent == SOCKET_ERROR) {
-				std::cerr << "send failed: " << WSAGetLastError() << std::endl;
-				closesocket(clientSocket);
-				WSACleanup();
+			if (!SendPacket(client.socket_, &chatPacket.header)) {
+				std::cerr << "Failed to send packet to server." << std::endl;
+				break;
+			}
+
+			if (!SendPacket(client.socket_, &movePacket.header)) {
+				std::cerr << "Failed to send packet to server." << std::endl;
 				break;
 			}
 
 			std::cout << "Message sent to server: " << chatPacket.message
 					  << std::endl;
 
-			char buffer[1024];
-			int bytesReceived =
-				recv(clientSocket, buffer, sizeof(buffer) - 1, 0);
-			if (bytesReceived == SOCKET_ERROR) {
-				std::cerr << "recv failed: " << WSAGetLastError() << std::endl;
-				closesocket(clientSocket);
-				WSACleanup();
+			Sleep(1000);
+		}
+	});
+
+	std::thread receiveThread([&client, &buffer]() {
+		while (true) {
+			if (!ReceivePacket(client.socket_, buffer, sizeof(PACKET_HEADER))) {
+				std::cerr << "Failed to receive packet from server."
+						  << std::endl;
 				break;
 			}
-			buffer[bytesReceived] = '\0';
+			
+			PACKET_HEADER* header = reinterpret_cast<PACKET_HEADER*>(buffer);
+			if (!ReceivePacket(client.socket_, buffer + sizeof(PACKET_HEADER),
+							   header->size - sizeof(PACKET_HEADER))) {
+				std::cerr << "Failed to receive full packet from server."
+						  << std::endl;
+				break;
+			}
 
-			std::cout << "Message received from server: "
-					  << buffer + sizeof(PACKET_HEADER) << std::endl;
-
-			Sleep(1000);
+			if (!HandlePacket(header)) {
+				std::cerr << "Failed to handle packet from server."
+						  << std::endl;
+				break;
+			}
 		}
 	});
 
 	// 유저의 종료 신호를 기다립니다. 예: Enter 키
 	std::cout << "Press Enter to stop the client..." << std::endl;
 	std::cin.get();
-
-	std::cout << "Closing connection..." << std::endl;
-
-	closesocket(clientSocket);
-	WSACleanup();
 
 	std::cout << "Echo client stopped." << std::endl;
 

@@ -2,15 +2,16 @@ CXX = g++
 CXXFLAGS= -I. -std=c++20 -O3 -Wall -Wextra
 LDFLAGS = -lws2_32
 
-SRCS = $(wildcard Network/Common/*.cpp) $(wildcard Network/Server/*.cpp)
+SERVER = $(wildcard Network/Common/*.cpp) $(wildcard Network/Server/*.cpp)
+CLIENT = $(wildcard Network/Common/*.cpp) $(wildcard Network/Client/*.cpp)
 TARGETS = bin/Server.exe bin/Client.exe
 
 all: $(TARGETS)
 
-bin/Server.exe: $(SRCS)
+bin/Server.exe: $(SERVER)
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)
 
-bin/Client.exe: Network/Client/Client.cpp
+bin/Client.exe: $(CLIENT)
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)
 
 clean:
