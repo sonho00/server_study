@@ -4,7 +4,7 @@
 
 #include "Network/Common/NetUtils.hpp"
 
-MagicBuffer::MagicBuffer(size_t size) : size_(size) {
+MagicBuffer::MagicBuffer(const size_t size) : size_(size) {
 	SYSTEM_INFO sysInfo;
 	GetSystemInfo(&sysInfo);
 	if (size_ % sysInfo.dwAllocationGranularity != 0) {

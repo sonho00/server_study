@@ -11,17 +11,16 @@
 
 class Session : public PoolElement<Session> {
    public:
-	Session(size_t readBufferSize = 1 << 16, size_t writeBufferSize = 1 << 16)
+	Session(const size_t readBufferSize = 1 << 16,
+			const size_t writeBufferSize = 1 << 16)
 		: readOv(readBufferSize), writeOv(writeBufferSize) {}
 
 	bool RegisterRead();
-	bool RegisterWrite(void* packet, size_t packetSize);
+	bool RegisterWrite(const char* packet, const size_t packetSize);
 
-	bool OnRead(DWORD bytesTransferred);
-	bool OnWrite(DWORD bytesTransferred);
-	bool HandleIO(OverlappedEx* ovEx, DWORD bytesTransferred);
-
-	bool Broadcast(void* packet);
+	bool OnRead(const DWORD bytesTransferred);
+	bool OnWrite(const DWORD bytesTransferred);
+	bool HandleIO( OverlappedEx* ovEx, const DWORD bytesTransferred);
 
 	void Close();
 
@@ -29,13 +28,16 @@ class Session : public PoolElement<Session> {
 	OverlappedEx writeOv = {};
 	SOCKET socket_ = INVALID_SOCKET;
 
+   private:
 	std::atomic<bool> isSending_ = false;
 
-	std::function<bool(DWORD bytesTransferred)>
+	std::function<bool(const DWORD bytesTransferred)>
 		inputHandlers[static_cast<size_t>(IO_TYPE::CNT)] = {
 			nullptr,
-			[this](DWORD bytesTransferred) { return OnRead(bytesTransferred); },
-			[this](DWORD bytesTransferred) {
+			[this](const DWORD bytesTransferred) {
+				return OnRead(bytesTransferred);
+			},
+			[this](const DWORD bytesTransferred) {
 				return OnWrite(bytesTransferred);
 			}};
 };

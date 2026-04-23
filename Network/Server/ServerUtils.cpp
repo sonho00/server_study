@@ -27,7 +27,7 @@ NetFuncs::NetFuncs() {
 	}
 }
 
-SOCKET CreateListenSocket(USHORT port) {
+SOCKET CreateListenSocket(const USHORT port) {
 	SOCKET listenSocket = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, NULL, 0,
 									WSA_FLAG_OVERLAPPED);
 	if (listenSocket == INVALID_SOCKET) {

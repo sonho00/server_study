@@ -12,8 +12,8 @@ class IocpCore {
 	IocpCore();
 	~IocpCore();
 
-	bool Start(size_t threadCount);
-	bool Register(SOCKET socket, ULONG_PTR completionKey);
+	bool Start(const size_t threadCount);
+	bool Register(const SOCKET socket, const ULONG_PTR completionKey) const;
 
 	ObjectPool<Session, 1024> sessionPool_;
 

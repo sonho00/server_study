@@ -33,7 +33,7 @@ IocpCore::~IocpCore() {
 	CloseHandle(hIocp_);
 }
 
-bool IocpCore::Start(size_t threadCount) {
+bool IocpCore::Start(const size_t threadCount) {
 	threads_.resize(threadCount);
 	for (size_t i = 0; i < threadCount; ++i) {
 		threads_[i] = CreateThread(NULL, 0, WorkerThread, this, 0, NULL);
@@ -49,7 +49,8 @@ bool IocpCore::Start(size_t threadCount) {
 	return true;
 }
 
-bool IocpCore::Register(SOCKET socket, ULONG_PTR completionKey) {
+bool IocpCore::Register(const SOCKET socket,
+						const ULONG_PTR completionKey) const {
 	if (CreateIoCompletionPort(reinterpret_cast<HANDLE>(socket), hIocp_,
 							   completionKey, 0) == nullptr) {
 		NetUtils::PrintError("Failed to register socket with IOCP");
@@ -104,7 +105,7 @@ DWORD WINAPI IocpCore::WorkerThread(LPVOID lpParam) {
 
 		if (pOverlappedEx->ioType_ == IO_TYPE::ACCEPT) {
 			Listener* listener = reinterpret_cast<Listener*>(completionKey);
-			if (!listener->HandleAccept(pOverlappedEx, bytesTransferred)) {
+			if (!listener->HandleAccept(pOverlappedEx)) {
 				NetUtils::PrintError("Failed to handle accept");
 				continue;
 			}
@@ -118,8 +119,7 @@ DWORD WINAPI IocpCore::WorkerThread(LPVOID lpParam) {
 				continue;
 			}
 
-			if (!objPtr->inputHandlers[static_cast<size_t>(
-					pOverlappedEx->ioType_)](bytesTransferred)) {
+			if (!objPtr->HandleIO(pOverlappedEx, bytesTransferred)) {
 				NetUtils::PrintError("Failed to handle I/O operation");
 				objPtr->Close();
 				continue;

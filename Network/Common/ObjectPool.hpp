@@ -12,7 +12,7 @@ class PoolElement : public std::enable_shared_from_this<T> {
 	void Capture() { selfPtr_ = this->shared_from_this(); }
 	void Release() { selfPtr_.reset(); }
 
-	void SetPoolIdx(size_t idx) { poolIdx_ = idx; }
+	void SetPoolIdx(const size_t idx) { poolIdx_ = idx; }
 	size_t GetPoolIdx() const { return poolIdx_; }
 
    private:
@@ -48,7 +48,7 @@ class ObjectPool {
 
 		size_t currentPos = object->GetPoolIdx();
 		size_t lastObjectPos = idx_[--count_];
-		
+
 		std::swap(idx_[currentPos], idx_[count_]);
 		pool_[lastObjectPos].SetPoolIdx(currentPos);
 

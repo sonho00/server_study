@@ -8,5 +8,5 @@ struct NetFuncs {
 	NetFuncs();
 	LPFN_ACCEPTEX AcceptEx;
 };
-SOCKET CreateListenSocket(USHORT port);
+SOCKET CreateListenSocket(const USHORT port);
 }  // namespace ServerUtils

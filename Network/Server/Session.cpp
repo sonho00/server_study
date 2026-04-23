@@ -31,7 +31,7 @@ bool Session::RegisterRead() {
 	return true;
 }
 
-bool Session::RegisterWrite(void* packet, size_t packetSize) {
+bool Session::RegisterWrite(const char* packet, const size_t packetSize) {
 	if (writeOv.writePos_ - writeOv.readPos_ + packetSize >
 		writeOv.buffer_.GetSize()) {
 		NetUtils::PrintError("Write buffer overflow");
@@ -65,7 +65,7 @@ bool Session::RegisterWrite(void* packet, size_t packetSize) {
 	return true;
 }
 
-bool Session::OnRead(DWORD bytesTransferred) {
+bool Session::OnRead(const DWORD bytesTransferred) {
 	std::cout << "Session " << socket_ << " received " << bytesTransferred
 			  << " bytes." << std::endl;
 
@@ -111,7 +111,7 @@ bool Session::OnRead(DWORD bytesTransferred) {
 	return true;
 }
 
-bool Session::OnWrite(DWORD bytesTransferred) {
+bool Session::OnWrite(const DWORD bytesTransferred) {
 	std::cout << "Session " << socket_ << " sent " << bytesTransferred
 			  << " bytes." << std::endl;
 
@@ -137,7 +137,17 @@ bool Session::OnWrite(DWORD bytesTransferred) {
 	return true;
 }
 
-bool Session::Broadcast(void* packet) { return true; }
+bool Session::HandleIO( OverlappedEx* ovEx, const DWORD bytesTransferred) {
+	switch (ovEx->ioType_) {
+		case IO_TYPE::RECV:
+			return OnRead(bytesTransferred);
+		case IO_TYPE::SEND:
+			return OnWrite(bytesTransferred);
+		default:
+			NetUtils::PrintError("Unknown IO type");
+			return false;
+	}
+}
 
 void Session::Close() {
 	if (socket_ != INVALID_SOCKET) {

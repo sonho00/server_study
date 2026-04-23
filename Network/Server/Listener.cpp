@@ -10,7 +10,8 @@
 #include "ServerUtils.hpp"
 #include "Session.hpp"
 
-Listener::Listener(IocpCore* iocpCore, uint16_t port, LPFN_ACCEPTEX acceptEx)
+Listener::Listener(IocpCore* iocpCore, const uint16_t port,
+				   LPFN_ACCEPTEX acceptEx)
 	: iocpCore_(iocpCore), port_(port), acceptEx_(acceptEx) {
 	socket_ = ServerUtils::CreateListenSocket(port_);
 	if (socket_ == INVALID_SOCKET) {
@@ -34,8 +35,7 @@ Listener::~Listener() {
 	}
 }
 
-bool Listener::HandleAccept(OverlappedEx* overlappedEx,
-							DWORD bytesTransferred) {
+bool Listener::HandleAccept(const OverlappedEx* overlappedEx) {
 	std::cout << "Client connected." << std::endl;
 
 	if (!PostAccept()) {
