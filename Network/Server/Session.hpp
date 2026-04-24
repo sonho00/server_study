@@ -20,7 +20,7 @@ class Session : public PoolElement<Session> {
 
 	bool OnRead(const DWORD bytesTransferred);
 	bool OnWrite(const DWORD bytesTransferred);
-	bool HandleIO( OverlappedEx* ovEx, const DWORD bytesTransferred);
+	bool HandleIO(OverlappedEx* ovEx, const DWORD bytesTransferred);
 
 	void Close();
 

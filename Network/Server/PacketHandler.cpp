@@ -1,7 +1,5 @@
 #include "PacketHandler.hpp"
 
-#include <iostream>
-
 #include "Network/Common/NetUtils.hpp"
 #include "Network/Common/Protocol.hpp"
 #include "Session.hpp"
@@ -12,9 +10,7 @@ std::function<bool(Session*, const PACKET_HEADER*)>
 
 bool HandleC2S_MOVE(Session* session, const PACKET_HEADER* header) {
 	const C2S_MOVE* movePacket = reinterpret_cast<const C2S_MOVE*>(header);
-	std::cout << "Session " << session->socket_
-			  << " handling C2S_MOVE packet: x=" << movePacket->x
-			  << " y=" << movePacket->y << std::endl;
+
 	if (!session->RegisterWrite(reinterpret_cast<const char*>(movePacket),
 								movePacket->header.size)) {
 		NetUtils::PrintError("Failed to post write for C2S_MOVE packet");
@@ -27,9 +23,6 @@ REGISTER_PACKET_HANDLER(MOVE, HandleC2S_MOVE);
 
 bool HandleC2S_CHAT(Session* session, const PACKET_HEADER* header) {
 	const C2S_CHAT* chatPacket = reinterpret_cast<const C2S_CHAT*>(header);
-	std::cout << "Session " << session->socket_
-			  << " handling C2S_CHAT packet: message=" << chatPacket->message
-			  << std::endl;
 
 	if (!session->RegisterWrite(reinterpret_cast<const char*>(chatPacket),
 								chatPacket->header.size)) {

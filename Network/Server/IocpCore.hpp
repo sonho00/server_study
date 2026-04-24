@@ -15,7 +15,7 @@ class IocpCore {
 	bool Start(const size_t threadCount);
 	bool Register(const SOCKET socket, const ULONG_PTR completionKey) const;
 
-	ObjectPool<Session, 1024> sessionPool_;
+	ObjectPool<Session, 4096> sessionPool_;
 
    private:
 	static DWORD WINAPI WorkerThread(LPVOID lpParam);

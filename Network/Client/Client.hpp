@@ -1,7 +1,6 @@
 #pragma once
 
 #include <WinSock2.h>
-#include <winsock2.h>
 
 #include "Network/Common/Protocol.hpp"
 
@@ -19,6 +18,9 @@ class Client {
 
 	bool HandlePacket(const PACKET_HEADER* header);
 
+	void ThreadFunc();
+
    private:
+	char buffer_[1024];
 	const SOCKET socket_;
 };

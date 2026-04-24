@@ -3,7 +3,6 @@
 #include <WinSock2.h>
 
 #include <cstring>
-#include <iostream>
 #include <string>
 
 #include "Network/Common/NetUtils.hpp"
@@ -66,9 +65,6 @@ bool Session::RegisterWrite(const char* packet, const size_t packetSize) {
 }
 
 bool Session::OnRead(const DWORD bytesTransferred) {
-	std::cout << "Session " << socket_ << " received " << bytesTransferred
-			  << " bytes." << std::endl;
-
 	readOv.writePos_ += bytesTransferred;
 
 	while (true) {
@@ -112,9 +108,6 @@ bool Session::OnRead(const DWORD bytesTransferred) {
 }
 
 bool Session::OnWrite(const DWORD bytesTransferred) {
-	std::cout << "Session " << socket_ << " sent " << bytesTransferred
-			  << " bytes." << std::endl;
-
 	writeOv.readPos_ += bytesTransferred;
 
 	if (writeOv.readPos_ >= writeOv.buffer_.GetSize()) {
@@ -137,7 +130,7 @@ bool Session::OnWrite(const DWORD bytesTransferred) {
 	return true;
 }
 
-bool Session::HandleIO( OverlappedEx* ovEx, const DWORD bytesTransferred) {
+bool Session::HandleIO(OverlappedEx* ovEx, const DWORD bytesTransferred) {
 	switch (ovEx->ioType_) {
 		case IO_TYPE::RECV:
 			return OnRead(bytesTransferred);

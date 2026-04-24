@@ -2,7 +2,7 @@
 
 #include <WinSock2.h>
 
-#include <iostream>
+#include <string>
 
 #include "IocpCore.hpp"
 #include "Network/Common/NetUtils.hpp"
@@ -16,6 +16,14 @@ Listener::Listener(IocpCore* iocpCore, const uint16_t port,
 	socket_ = ServerUtils::CreateListenSocket(port_);
 	if (socket_ == INVALID_SOCKET) {
 		throw std::runtime_error("Failed to create listen socket");
+	}
+
+	int opt = 1;
+	if (setsockopt(socket_, SOL_SOCKET, SO_REUSEADDR, (const char*)&opt,
+				   sizeof(opt)) == SOCKET_ERROR) {
+		int errorCode = WSAGetLastError();
+		throw std::runtime_error("setsockopt(SO_REUSEADDR) failed: " +
+								 std::to_string(errorCode));
 	}
 
 	acceptOv.ioType_ = IO_TYPE::ACCEPT;
@@ -36,11 +44,9 @@ Listener::~Listener() {
 }
 
 bool Listener::HandleAccept(const OverlappedEx* overlappedEx) {
-	std::cout << "Client connected." << std::endl;
-
 	if (!PostAccept()) {
-		NetUtils::PrintError("Failed to post accept");
-		return false;
+		// NetUtils::PrintError("Failed to post accept");
+		// return false;
 	}
 
 	Session* session = CONTAINING_RECORD(overlappedEx, Session, readOv);
@@ -70,7 +76,7 @@ bool Listener::PostAccept() {
 
 	std::shared_ptr<Session> session = iocpCore_->sessionPool_.Acquire();
 	if (!session) {
-		NetUtils::PrintError("Failed to get session from pool");
+		// NetUtils::PrintError("Failed to get session from pool");
 		return false;
 	}
 
@@ -93,10 +99,13 @@ bool Listener::PostAccept() {
 		socket_, hAcceptSocket, session->readOv.buffer_.GetBuffer(), 0, addrLen,
 		addrLen, &bytesReceived, &session->readOv.overlapped_);
 
-	if (!result && WSAGetLastError() != ERROR_IO_PENDING) {
-		NetUtils::PrintError("AcceptEx failed");
-		session->Close();
-		return false;
+	if (!result) {
+		int errorCode = WSAGetLastError();
+		if (errorCode != ERROR_IO_PENDING) {
+			NetUtils::PrintError("AcceptEx failed");
+			session->Close();
+			return false;
+		}
 	}
 
 	return true;
