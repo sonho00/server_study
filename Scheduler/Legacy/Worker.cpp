@@ -55,7 +55,7 @@ size_t Worker::TryStealAny(size_t batch_size = 256) {
 	static thread_local std::mt19937 rng(std::random_device{}());
 	std::uniform_int_distribution<int> dist(0, ctx.num_threads_ - 1);
 
-	for (int i = 0; i < ctx.num_threads_; i++) {
+	for (int i = 0; i < 5; i++) {
 		int victim_id = dist(rng);
 		int cnt = TryStealFrom(workers[victim_id], batch_size);
 		if (cnt > 0) return cnt;

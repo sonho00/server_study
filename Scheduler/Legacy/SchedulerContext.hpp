@@ -9,7 +9,7 @@
 using Task = std::function<void()>;
 
 struct SchedulerContext {
-	int num_threads_ = std::thread::hardware_concurrency();
+	int num_threads_ = 1000;
 
 	std::deque<Task*> global_queue_;
 	std::mutex mtx_;
