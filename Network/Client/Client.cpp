@@ -22,6 +22,13 @@ Client::Client(const char* ip, const uint16_t port)
 								 std::to_string(WSAGetLastError()));
 	}
 
+	int tcp_opt = 1;
+	if (setsockopt(socket_, IPPROTO_TCP, TCP_NODELAY, (const char*)&tcp_opt,
+				   sizeof(tcp_opt)) == SOCKET_ERROR) {
+		throw std::runtime_error("setsockopt TCP_NODELAY failed: " +
+								 std::to_string(WSAGetLastError()));
+	}
+
 	sockaddr_in serverAddr;
 	serverAddr.sin_family = AF_INET;
 	InetPton(AF_INET, ip, &serverAddr.sin_addr);

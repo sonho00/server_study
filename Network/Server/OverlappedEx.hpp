@@ -16,6 +16,6 @@ struct OverlappedEx {
 	WSABUF wsaBuf_ = {};
 	MagicBuffer buffer_;
 
-	std::atomic<size_t> readPos_ = 0;
-	std::atomic<size_t> writePos_ = 0;
+	size_t readPos_ = 0;
+	size_t writePos_ = 0;
 };

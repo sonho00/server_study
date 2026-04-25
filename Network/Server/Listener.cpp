@@ -26,6 +26,13 @@ Listener::Listener(IocpCore* iocpCore, const uint16_t port,
 								 std::to_string(errorCode));
 	}
 
+	int tcp_opt = 1;
+	if (setsockopt(socket_, IPPROTO_TCP, TCP_NODELAY, (const char*)&tcp_opt,
+				   sizeof(tcp_opt)) == SOCKET_ERROR) {
+		throw std::runtime_error("setsockopt TCP_NODELAY failed: " +
+								 std::to_string(WSAGetLastError()));
+	}
+
 	acceptOv.ioType_ = IO_TYPE::ACCEPT;
 	acceptOv.wsaBuf_.buf = acceptOv.buffer_.GetBuffer();
 	acceptOv.wsaBuf_.len = static_cast<ULONG>(acceptOv.buffer_.GetSize()) - 1;

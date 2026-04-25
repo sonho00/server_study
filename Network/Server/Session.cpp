@@ -76,6 +76,13 @@ bool Session::SendPacket(const char* packet) {
 }
 
 bool Session::OnRead(const DWORD bytesTransferred) {
+	if (readOv.writePos_ - readOv.readPos_ + bytesTransferred >
+		readOv.buffer_.GetSize()) {
+		NetUtils::PrintError("]Read buffer overflow detected");
+		Close();
+		return false;
+	}
+
 	readOv.writePos_ += bytesTransferred;
 
 	while (true) {
@@ -122,6 +129,13 @@ bool Session::OnWrite(const DWORD bytesTransferred) {
 	// 이 함수가 호출될 때는 is sending_가 true인 상태입니다.
 
 	std::lock_guard<std::mutex> lock(mtx);
+	if (writeOv.writePos_ - writeOv.readPos_ + bytesTransferred >
+		writeOv.buffer_.GetSize()) {
+		NetUtils::PrintError("Write buffer overflow detected");
+		Close();
+		return false;
+	}
+
 	writeOv.readPos_ += bytesTransferred;
 
 	if (writeOv.readPos_ >= writeOv.buffer_.GetSize()) {

@@ -32,7 +32,7 @@ class Session : public PoolElement<Session> {
 
    private:
 	std::mutex mtx;
-	std::atomic<bool> isSending_ = false;
+	bool isSending_ = false;
 
 	std::function<bool(const DWORD bytesTransferred)>
 		inputHandlers[static_cast<size_t>(IO_TYPE::CNT)] = {
