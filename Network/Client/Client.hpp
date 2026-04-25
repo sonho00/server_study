@@ -14,11 +14,11 @@ class Client {
 	SOCKET GetSocket() const { return socket_; }
 
 	bool SendPacket(const PACKET_HEADER* header);
-	bool ReceivePacket(char* buffer, const size_t bufferSize);
+	bool ReceiveByte(char* buffer, const size_t bufferSize);
 
 	bool HandlePacket(const PACKET_HEADER* header);
 
-	void ThreadFunc();
+	void ThreadFunc(int i);
 
    private:
 	char buffer_[1024];

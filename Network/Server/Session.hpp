@@ -4,6 +4,7 @@
 
 #include <atomic>
 #include <functional>
+#include <mutex>
 
 #include "Network/Common/ObjectPool.hpp"
 #include "Network/Common/Protocol.hpp"
@@ -16,7 +17,8 @@ class Session : public PoolElement<Session> {
 		: readOv(readBufferSize), writeOv(writeBufferSize) {}
 
 	bool RegisterRead();
-	bool RegisterWrite(const char* packet, const size_t packetSize);
+	bool RegisterWrite();
+	bool SendPacket(const char* packet);
 
 	bool OnRead(const DWORD bytesTransferred);
 	bool OnWrite(const DWORD bytesTransferred);
@@ -29,6 +31,7 @@ class Session : public PoolElement<Session> {
 	SOCKET socket_ = INVALID_SOCKET;
 
    private:
+	std::mutex mtx;
 	std::atomic<bool> isSending_ = false;
 
 	std::function<bool(const DWORD bytesTransferred)>

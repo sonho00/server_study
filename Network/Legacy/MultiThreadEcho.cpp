@@ -21,7 +21,7 @@ void handleClient(SOCKET clientSocket) {
 			break;
 		}
 	}
-
+	
 	closesocket(clientSocket);
 }
 
@@ -73,20 +73,26 @@ int main() {
 
 	std::cout << "Listening for incoming connections..." << std::endl;
 
-	while (true) {
-		sockaddr_in clientAddr;
-		int clientAddrSize = sizeof(clientAddr);
-		SOCKET clientSocket =
-			accept(listenSocket, (sockaddr*)&clientAddr, &clientAddrSize);
+	std::thread serverThread([&]() {
+		while (true) {
+			sockaddr_in clientAddr;
+			int clientAddrSize = sizeof(clientAddr);
+			SOCKET clientSocket =
+				accept(listenSocket, (sockaddr*)&clientAddr, &clientAddrSize);
 
-		if (clientSocket == INVALID_SOCKET) {
-			NetUtils::PrintError("accept failed");
-			continue;
+			if (clientSocket == INVALID_SOCKET) {
+				NetUtils::PrintError("accept failed");
+				continue;
+			}
+
+			std::thread clientThread(handleClient, clientSocket);
+			clientThread.detach();
 		}
+	});
 
-		std::thread clientThread(handleClient, clientSocket);
-		clientThread.detach();
-	}
+	// 유저의 종료 신호를 기다립니다. 예: Enter 키
+	std::cout << "Press Enter to stop the server..." << std::endl;
+	std::cin.get();
 
 	closesocket(listenSocket);
 	WSACleanup();

@@ -59,7 +59,7 @@ bool Client::SendPacket(const PACKET_HEADER* header) {
 	return true;
 }
 
-bool Client::ReceivePacket(char* buffer, const size_t len) {
+bool Client::ReceiveByte(char* buffer, const size_t len) {
 	size_t bytesReceived = 0;
 	while (bytesReceived < len) {
 		int result =
@@ -73,12 +73,6 @@ bool Client::ReceivePacket(char* buffer, const size_t len) {
 			return false;
 		}
 		bytesReceived += result;
-		if (bytesReceived >= sizeof(PACKET_HEADER)) {
-			PACKET_HEADER* header = reinterpret_cast<PACKET_HEADER*>(buffer);
-			if (bytesReceived >= header->size) {
-				break;
-			}
-		}
 	}
 	return true;
 }
@@ -106,45 +100,21 @@ bool Client::HandlePacket(const PACKET_HEADER* header) {
 
 extern C2S_MOVE movePacket;
 extern C2S_CHAT chatPacket;
-void Client::ThreadFunc() {
-	while (true) {
+void Client::ThreadFunc(int i) {
+	for (int j = 0; j < 100; ++j) {
 		if (!SendPacket(&chatPacket.header)) {
 			NetUtils::PrintError("Failed to send packet to server.");
 			break;
 		}
 
-		if (!SendPacket(&movePacket.header)) {
-			NetUtils::PrintError("Failed to send packet to server.");
-			break;
-		}
-
-		Sleep(1000);
-
-		if (!ReceivePacket(buffer_, sizeof(PACKET_HEADER))) {
+		if (!ReceiveByte(buffer_, sizeof(PACKET_HEADER))) {
 			NetUtils::PrintError("Failed to receive packet from server.");
 			break;
 		}
 
 		PACKET_HEADER* header = reinterpret_cast<PACKET_HEADER*>(buffer_);
-		if (!ReceivePacket(buffer_ + sizeof(PACKET_HEADER),
-						   header->size - sizeof(PACKET_HEADER))) {
-			NetUtils::PrintError("Failed to receive full packet from server.");
-			break;
-		}
-
-		if (!HandlePacket(header)) {
-			NetUtils::PrintError("Failed to handle packet from server.");
-			break;
-		}
-
-		if (!ReceivePacket(buffer_, sizeof(PACKET_HEADER))) {
-			NetUtils::PrintError("Failed to receive packet from server.");
-			break;
-		}
-
-		header = reinterpret_cast<PACKET_HEADER*>(buffer_);
-		if (!ReceivePacket(buffer_ + sizeof(PACKET_HEADER),
-						   header->size - sizeof(PACKET_HEADER))) {
+		if (!ReceiveByte(buffer_ + sizeof(PACKET_HEADER),
+						 header->size - sizeof(PACKET_HEADER))) {
 			NetUtils::PrintError("Failed to receive full packet from server.");
 			break;
 		}
@@ -154,5 +124,4 @@ void Client::ThreadFunc() {
 			break;
 		}
 	}
-	NetUtils::PrintError("Error occurred in client thread.");
 }

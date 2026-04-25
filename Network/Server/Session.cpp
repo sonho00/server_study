@@ -6,6 +6,7 @@
 #include <string>
 
 #include "Network/Common/NetUtils.hpp"
+#include "Network/Common/Protocol.hpp"
 #include "OverlappedEx.hpp"
 #include "PacketHandler.hpp"
 
@@ -30,23 +31,12 @@ bool Session::RegisterRead() {
 	return true;
 }
 
-bool Session::RegisterWrite(const char* packet, const size_t packetSize) {
-	if (writeOv.writePos_ - writeOv.readPos_ + packetSize >
-		writeOv.buffer_.GetSize()) {
-		NetUtils::PrintError("Write buffer overflow");
-		return false;
-	}
-
-	memcpy(writeOv.buffer_.GetBuffer() + writeOv.writePos_, packet, packetSize);
-	writeOv.writePos_ += packetSize;
-
-	if (isSending_) return true;
-	isSending_ = true;
-
+bool Session::RegisterWrite() {
+	// 이 함수는 mtx 락을 획득한 상태이고 isSending_가 true인 상태에서만
+	// 호출되어야 합니다.
 	writeOv.ioType_ = IO_TYPE::SEND;
 	writeOv.wsaBuf_.buf = writeOv.buffer_.GetBuffer() + writeOv.readPos_;
-	writeOv.wsaBuf_.len =
-		static_cast<ULONG>(writeOv.writePos_ - writeOv.readPos_);
+	writeOv.wsaBuf_.len = writeOv.writePos_ - writeOv.readPos_;
 	ZeroMemory(&writeOv.overlapped_, sizeof(OVERLAPPED));
 	DWORD flags = 0;
 	int sendResult = WSASend(socket_, &writeOv.wsaBuf_, 1, NULL, flags,
@@ -57,6 +47,27 @@ bool Session::RegisterWrite(const char* packet, const size_t packetSize) {
 		if (errorCode != ERROR_IO_PENDING) {
 			NetUtils::PrintError("WSASend failed", errorCode);
 			Close();
+			return false;
+		}
+	}
+
+	return true;
+}
+
+bool Session::SendPacket(const char* packet) {
+	std::lock_guard<std::mutex> lock(mtx);
+
+	const PACKET_HEADER* header =
+		reinterpret_cast<const PACKET_HEADER*>(packet);
+	memcpy(writeOv.buffer_.GetBuffer() + writeOv.writePos_, packet,
+		   header->size);
+	writeOv.writePos_ += header->size;
+
+	if (!isSending_) {
+		isSending_ = true;
+
+		if (!RegisterWrite()) {
+			NetUtils::PrintError("Failed to post another write");
 			return false;
 		}
 	}
@@ -108,6 +119,9 @@ bool Session::OnRead(const DWORD bytesTransferred) {
 }
 
 bool Session::OnWrite(const DWORD bytesTransferred) {
+	// 이 함수가 호출될 때는 is sending_가 true인 상태입니다.
+
+	std::lock_guard<std::mutex> lock(mtx);
 	writeOv.readPos_ += bytesTransferred;
 
 	if (writeOv.readPos_ >= writeOv.buffer_.GetSize()) {
@@ -115,14 +129,12 @@ bool Session::OnWrite(const DWORD bytesTransferred) {
 		writeOv.writePos_ -= writeOv.buffer_.GetSize();
 	}
 
-	size_t availableData = writeOv.writePos_ - writeOv.readPos_;
-	if (availableData == 0) {
+	if (writeOv.readPos_ == writeOv.writePos_) {
 		isSending_ = false;
 		return true;
 	}
 
-	if (!RegisterWrite(writeOv.buffer_.GetBuffer() + writeOv.readPos_,
-					   availableData)) {
+	if (!RegisterWrite()) {
 		NetUtils::PrintError("Failed to post another write");
 		return false;
 	}

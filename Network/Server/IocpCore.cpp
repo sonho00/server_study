@@ -3,6 +3,7 @@
 #include <WinSock2.h>
 
 #include <memory>
+#include <string>
 
 #include "Listener.hpp"
 #include "Network/Common/NetUtils.hpp"
@@ -114,7 +115,8 @@ DWORD WINAPI IocpCore::WorkerThread(LPVOID lpParam) {
 				reinterpret_cast<Session*>(completionKey)->shared_from_this();
 
 			if (bytesTransferred == 0) {
-				std::cout << "Connection closed by client." << std::endl;
+				std::string s = "Connection closed by client\n";
+				std::cout << s;
 				objPtr->Close();
 				continue;
 			}

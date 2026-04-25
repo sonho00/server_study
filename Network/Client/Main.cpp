@@ -1,7 +1,10 @@
 #include <winsock2.h>
 #include <ws2tcpip.h>
 
+#include <algorithm>
+#include <fstream>
 #include <iostream>
+#include <numeric>
 #include <string>
 #include <thread>
 #include <vector>
@@ -16,14 +19,13 @@ C2S_MOVE movePacket;
 C2S_CHAT chatPacket;
 
 int main(int argc, char* argv[]) {
+	int clientCount = argc > 1 ? std::stoi(argv[1]) : 1000;
+
 	std::cout << "Starting echo client..." << std::endl;
 
 	WSAManager wsaManager;
 
 	std::cout << "Echo client started." << std::endl;
-
-	const char* serverIp = "127.0.0.1";
-	uint16_t serverPort = 8080;
 
 	chatPacket.header.id = static_cast<uint16_t>(C2S_PACKET_ID::CHAT);
 	chatPacket.header.size =
@@ -38,21 +40,35 @@ int main(int argc, char* argv[]) {
 
 	std::cout << "Creating clients and connecting to server..." << std::endl;
 
+	const char* serverIp = "127.0.0.1";
+	uint16_t serverPort = 8080;
 	std::vector<Client> clients;
-	clients.reserve(4000);
-	for (int i = 0; i < (argc > 1 ? std::stoi(argv[1]) : 4000); ++i) {
+	std::vector<std::thread> threads;
+	threads.reserve(clientCount);
+	clients.reserve(clientCount);
+
+	for (int i = 0; i < clientCount; ++i) {
 		try {
 			clients.emplace_back(serverIp, serverPort);
-			std::thread(&Client::ThreadFunc, &clients.back()).detach();
 		} catch (const std::exception& ex) {
 			std::cerr << "Failed to create client: " << ex.what() << std::endl;
 			break;
 		}
 	}
 
+	for (int i = 0; i < clientCount; ++i) {
+		threads.emplace_back(&Client::ThreadFunc, &clients[i], i);
+	}
+
 	// 유저의 종료 신호를 기다립니다. 예: Enter 키
 	std::cout << "Press Enter to stop the client..." << std::endl;
 	std::cin.get();
+
+	for (auto& thread : threads) {
+		if (thread.joinable()) {
+			thread.join();
+		}
+	}
 
 	std::cout << "Echo client stopped." << std::endl;
 

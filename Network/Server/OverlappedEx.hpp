@@ -2,6 +2,8 @@
 
 #include <WinSock2.h>
 
+#include <atomic>
+
 #include "Network/Common/MagicBuffer.hpp"
 #include "Network/Common/Protocol.hpp"
 
@@ -14,6 +16,6 @@ struct OverlappedEx {
 	WSABUF wsaBuf_ = {};
 	MagicBuffer buffer_;
 
-	size_t readPos_ = 0;
-	size_t writePos_ = 0;
+	std::atomic<size_t> readPos_ = 0;
+	std::atomic<size_t> writePos_ = 0;
 };
