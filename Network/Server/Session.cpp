@@ -19,9 +19,9 @@ bool Session::RegisterRead() {
 							 &readOv.overlapped_, NULL);
 
 	LOG_DEBUG(
-		"[Session:{:#x}] Posted WSARecv - Overlapped: {} BufferPos:{}, "
+		"[Session:{}] Posted WSARecv - Overlapped: {} BufferPos:{}, "
 		"BufferLen:{}",
-		reinterpret_cast<size_t>(this), static_cast<void*>(&readOv.overlapped_),
+		static_cast<void*>(this), static_cast<void*>(&readOv.overlapped_),
 		readOv.writePos_, readOv.wsaBuf_.len);
 
 	if (recvResult == SOCKET_ERROR) {
@@ -48,11 +48,10 @@ bool Session::RegisterWrite() {
 							 &writeOv.overlapped_, NULL);
 
 	LOG_DEBUG(
-		"[Session:{:#x}] Posted WSASend - Overlapped: {} BufferPos:{}, "
+		"[Session:{}] Posted WSASend - Overlapped: {} BufferPos:{}, "
 		"BufferLen:{}",
-		reinterpret_cast<size_t>(this),
-		static_cast<void*>(&writeOv.overlapped_), writeOv.readPos_,
-		writeOv.wsaBuf_.len);
+		static_cast<void*>(this), static_cast<void*>(&writeOv.overlapped_),
+		writeOv.readPos_, writeOv.wsaBuf_.len);
 
 	if (sendResult == SOCKET_ERROR) {
 		int errorCode = WSAGetLastError();

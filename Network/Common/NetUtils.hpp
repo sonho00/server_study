@@ -46,45 +46,40 @@ inline std::string_view GetLevelStr(LogLevel level) {
 
 template <typename... Args>
 inline void LogInfo(LogLevel level, std::string_view fmt_str, Args&&... args) {
+	auto now = std::chrono::system_clock::now();
 	try {
 		if (level < gLogLevel) return;
-		auto now = std::chrono::system_clock::now();
-		auto localTime = std::chrono::current_zone()->to_local(now);
 		std::string msg = std::vformat(fmt_str, std::make_format_args(args...));
 
-		std::cout << std::format("[{:%F %X}][{}] {}\n", localTime,
-								 GetLevelStr(level), msg);
-
-		if (level == LogLevel::Fatal) {
-			throw std::runtime_error(msg);
-		}
+		std::cout << std::format("[{:%F %T}][{}]{}\n", now, GetLevelStr(level),
+								 msg);
 	} catch (const std::format_error& e) {
-		std::cerr << "[Format Error] " << e.what() << std::endl;
+		std::cerr << std::format("[{:%F %T}][{}]Log formatting error: {}\n",
+								 now, GetLevelStr(level), e.what());
 	}
 }
 
 template <typename... Args>
-inline void LogError(
-	LogLevel level, std::string_view fmt_str,
-	std::source_location location = std::source_location::current(),
-	Args&&... args) {
+inline void LogError(LogLevel level, std::string_view fmt_str,
+					 std::source_location location, Args&&... args) {
 	auto now = std::chrono::system_clock::now();
-	auto localTime = std::chrono::current_zone()->to_local(now);
 	try {
+		if (level < gLogLevel) return;
 		std::string msg = std::vformat(fmt_str, std::make_format_args(args...));
 
-		std::cerr << std::format("[{:%F %X}][{}][{}:{}] {}\n", localTime,
+		std::cerr << std::format("[{:%F %T}][{}][{}:{}]{}\n", now,
 								 GetLevelStr(level), location.file_name(),
 								 location.line(), msg);
-
 		if (level == LogLevel::Fatal) {
+			std::cout.flush();
+			std::cerr.flush();
 			throw std::runtime_error(msg);
 		}
 	} catch (const std::format_error& e) {
-		std::cerr << std::format("[{:%F %X}][{}][{}:{}] [Format Error] {}\n",
-								 localTime, GetLevelStr(level),
-								 location.file_name(), location.line(),
-								 e.what());
+		std::cerr << std::format(
+			"[{:%F %T}][{}][{}:{}]Log formatting error: {}\n", now,
+			GetLevelStr(level), location.file_name(), location.line(),
+			e.what());
 	}
 }
 }  // namespace NetUtils

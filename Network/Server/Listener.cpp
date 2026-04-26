@@ -19,8 +19,7 @@ Listener::Listener(IocpCore* iocpCore, const uint16_t port,
 	int opt = 1;
 	if (setsockopt(socket_, SOL_SOCKET, SO_REUSEADDR, (const char*)&opt,
 				   sizeof(opt)) == SOCKET_ERROR) {
-		int errorCode = WSAGetLastError();
-		LOG_ERROR("setsockopt(SO_REUSEADDR) failed: {}", errorCode);
+		LOG_ERROR("setsockopt(SO_REUSEADDR) failed: {}", WSAGetLastError());
 	}
 
 	int tcp_opt = 1;
