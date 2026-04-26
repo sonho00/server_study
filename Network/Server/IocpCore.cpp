@@ -3,7 +3,6 @@
 #include <WinSock2.h>
 
 #include <memory>
-#include <string>
 
 #include "Listener.hpp"
 #include "Network/Common/NetUtils.hpp"
@@ -13,7 +12,7 @@
 IocpCore::IocpCore() {
 	hIocp_ = CreateIoCompletionPort(INVALID_HANDLE_VALUE, nullptr, 0, 0);
 	if (hIocp_ == nullptr) {
-		throw std::runtime_error("Failed to create IOCP");
+		LOG_FATAL("Failed to create IOCP: {}", GetLastError());
 	}
 }
 
@@ -39,7 +38,7 @@ bool IocpCore::Start(const size_t threadCount) {
 	for (size_t i = 0; i < threadCount; ++i) {
 		threads_[i] = CreateThread(NULL, 0, WorkerThread, this, 0, NULL);
 		if (threads_[i] == NULL) {
-			NetUtils::PrintError("Failed to create worker thread");
+			LOG_FATAL("Failed to create worker thread: {}", GetLastError());
 			for (size_t j = 0; j < i; ++j) {
 				CloseHandle(threads_[j]);
 			}
@@ -54,7 +53,7 @@ bool IocpCore::Register(const SOCKET socket,
 						const ULONG_PTR completionKey) const {
 	if (CreateIoCompletionPort(reinterpret_cast<HANDLE>(socket), hIocp_,
 							   completionKey, 0) == nullptr) {
-		NetUtils::PrintError("Failed to register socket with IOCP");
+		LOG_ERROR("Failed to register socket with IOCP: {}", GetLastError());
 		return false;
 	}
 	return true;
@@ -76,25 +75,32 @@ DWORD WINAPI IocpCore::WorkerThread(LPVOID lpParam) {
 
 		if (!pOverlappedEx) {
 			if (result) {
-				std::cout << "IOCP is shutting down." << std::endl;
+				LOG_INFO("IOCP is shutting down.");
 				break;
 			} else {
-				NetUtils::PrintError("GetQueuedCompletionStatus failed");
+				LOG_ERROR("GetQueuedCompletionStatus failed: {}",
+						  GetLastError());
 				continue;
 			}
 		}
 
+		LOG_DEBUG(
+			"GQCS - IOType: {} CompletionKey: {:#x} Overlapped: {} "
+			"BytesTransferred: {}",
+			static_cast<int>(pOverlappedEx->ioType_), completionKey,
+			static_cast<void*>(pOverlappedEx), bytesTransferred);
+
 		if (!result) {
 			int error = WSAGetLastError();
 			if (error == WSA_OPERATION_ABORTED) {
-				std::cout << "IOCP is shutting down." << std::endl;
+				LOG_INFO("IOCP is shutting down.");
 				break;
 			}
 
 			if (pOverlappedEx->ioType_ == IO_TYPE::ACCEPT) {
-				NetUtils::PrintError("Accept operation failed");
+				LOG_ERROR("Accept operation failed: {}", error);
 			} else {
-				NetUtils::PrintError("I/O operation failed");
+				LOG_ERROR("I/O operation failed: {}", error);
 
 				std::shared_ptr<Session> objPtr =
 					reinterpret_cast<Session*>(completionKey)
@@ -107,24 +113,20 @@ DWORD WINAPI IocpCore::WorkerThread(LPVOID lpParam) {
 		if (pOverlappedEx->ioType_ == IO_TYPE::ACCEPT) {
 			Listener* listener = reinterpret_cast<Listener*>(completionKey);
 			if (!listener->HandleAccept(pOverlappedEx)) {
-				NetUtils::PrintError("Failed to handle accept");
-				continue;
+				LOG_ERROR("Failed to handle accept");
 			}
 		} else {
 			std::shared_ptr<Session> objPtr =
 				reinterpret_cast<Session*>(completionKey)->shared_from_this();
 
 			if (bytesTransferred == 0) {
-				std::string s = "Connection closed by client\n";
-				std::cout << s;
+				LOG_INFO("Connection closed by client");
 				objPtr->Close();
-				continue;
 			}
 
 			if (!objPtr->HandleIO(pOverlappedEx, bytesTransferred)) {
-				NetUtils::PrintError("Failed to handle I/O operation");
+				LOG_ERROR("Failed to handle I/O operation");
 				objPtr->Close();
-				continue;
 			}
 		}
 	}

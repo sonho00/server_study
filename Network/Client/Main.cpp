@@ -1,10 +1,7 @@
 #include <winsock2.h>
 #include <ws2tcpip.h>
 
-#include <algorithm>
-#include <fstream>
 #include <iostream>
-#include <numeric>
 #include <string>
 #include <thread>
 #include <vector>
@@ -21,11 +18,11 @@ C2S_CHAT chatPacket;
 int main(int argc, char* argv[]) {
 	int clientCount = argc > 1 ? std::stoi(argv[1]) : 1000;
 
-	std::cout << "Starting echo client..." << std::endl;
+	LOG_INFO("Starting echo client with {} clients...", clientCount);
 
 	WSAManager wsaManager;
 
-	std::cout << "Echo client started." << std::endl;
+	LOG_INFO("Echo client started.");
 
 	chatPacket.header.id = static_cast<uint16_t>(C2S_PACKET_ID::CHAT);
 	chatPacket.header.size =
@@ -38,7 +35,7 @@ int main(int argc, char* argv[]) {
 	movePacket.x = 1.0f;
 	movePacket.y = 2.0f;
 
-	std::cout << "Creating clients and connecting to server..." << std::endl;
+	LOG_INFO("Creating clients and connecting to server...");
 
 	const char* serverIp = "127.0.0.1";
 	uint16_t serverPort = 8080;
@@ -51,7 +48,7 @@ int main(int argc, char* argv[]) {
 		try {
 			clients.emplace_back(serverIp, serverPort);
 		} catch (const std::exception& ex) {
-			std::cerr << "Failed to create client: " << ex.what() << std::endl;
+			LOG_ERROR("Failed to create client {}: {}", i, ex.what());
 			break;
 		}
 	}
@@ -61,7 +58,7 @@ int main(int argc, char* argv[]) {
 	}
 
 	// 유저의 종료 신호를 기다립니다. 예: Enter 키
-	std::cout << "Press Enter to stop the client..." << std::endl;
+	LOG_INFO("Press Enter to stop the client...");
 	std::cin.get();
 
 	for (auto& thread : threads) {
@@ -70,7 +67,7 @@ int main(int argc, char* argv[]) {
 		}
 	}
 
-	std::cout << "Echo client stopped." << std::endl;
+	LOG_INFO("Echo client stopped.");
 
 	return 0;
 }

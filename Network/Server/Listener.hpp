@@ -12,7 +12,7 @@ class IocpCore;
 class Listener {
    public:
 	Listener(IocpCore* iocpCore, const uint16_t port,
-			 const LPFN_ACCEPTEX acceptEx);
+			 const LPFN_ACCEPTEX acceptEx = nullptr);
 	~Listener();
 
 	bool HandleAccept(const OverlappedEx* overlappedEx);

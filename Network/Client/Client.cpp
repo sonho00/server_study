@@ -3,7 +3,6 @@
 #include <ws2tcpip.h>
 
 #include <cstddef>
-#include <string>
 
 #include "Network/Common/NetUtils.hpp"
 #include "Network/Common/Protocol.hpp"
@@ -11,22 +10,19 @@
 Client::Client(const char* ip, const uint16_t port)
 	: socket_(socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) {
 	if (socket_ == INVALID_SOCKET) {
-		throw std::runtime_error("socket failed: " +
-								 std::to_string(WSAGetLastError()));
+		LOG_FATAL("Failed to create socket: {}", WSAGetLastError());
 	}
 
 	int opt = 1;
 	if (setsockopt(socket_, SOL_SOCKET, SO_REUSEADDR, (const char*)&opt,
 				   sizeof(opt)) == SOCKET_ERROR) {
-		throw std::runtime_error("setsockopt failed: " +
-								 std::to_string(WSAGetLastError()));
+		LOG_ERROR("setsockopt(SO_REUSEADDR) failed: {}", WSAGetLastError());
 	}
 
 	int tcp_opt = 1;
 	if (setsockopt(socket_, IPPROTO_TCP, TCP_NODELAY, (const char*)&tcp_opt,
 				   sizeof(tcp_opt)) == SOCKET_ERROR) {
-		throw std::runtime_error("setsockopt TCP_NODELAY failed: " +
-								 std::to_string(WSAGetLastError()));
+		LOG_ERROR("setsockopt TCP_NODELAY failed: {}", WSAGetLastError());
 	}
 
 	sockaddr_in serverAddr;
@@ -36,8 +32,7 @@ Client::Client(const char* ip, const uint16_t port)
 	if (connect(socket_, (sockaddr*)&serverAddr, sizeof(serverAddr)) ==
 		SOCKET_ERROR) {
 		closesocket(socket_);
-		throw std::runtime_error("connect failed: " +
-								 std::to_string(WSAGetLastError()));
+		LOG_FATAL("connect failed: {}", WSAGetLastError());
 	}
 }
 
@@ -54,11 +49,11 @@ bool Client::SendPacket(const PACKET_HEADER* header) {
 		int result =
 			send(socket_, buffer + bytesSent, header->size - bytesSent, 0);
 		if (result == 0) {
-			NetUtils::PrintError("Connection closed by server.");
+			LOG_INFO("Connection closed by server.");
 			return false;
 		}
 		if (result == SOCKET_ERROR) {
-			NetUtils::PrintError("send failed");
+			LOG_ERROR("send failed: {}", WSAGetLastError());
 			return false;
 		}
 		bytesSent += result;
@@ -72,11 +67,11 @@ bool Client::ReceiveByte(char* buffer, const size_t len) {
 		int result =
 			recv(socket_, buffer + bytesReceived, len - bytesReceived, 0);
 		if (result == 0) {
-			NetUtils::PrintError("Connection closed by server.");
+			LOG_INFO("Connection closed by server.");
 			return false;
 		}
 		if (result == SOCKET_ERROR) {
-			NetUtils::PrintError("recv failed");
+			LOG_ERROR("recv failed: {}", WSAGetLastError());
 			return false;
 		}
 		bytesReceived += result;
@@ -86,19 +81,9 @@ bool Client::ReceiveByte(char* buffer, const size_t len) {
 
 bool Client::HandlePacket(const PACKET_HEADER* header) {
 	if (header->id == static_cast<uint16_t>(C2S_PACKET_ID::MOVE)) {
-		// const C2S_MOVE* moveResponse =
-		// 	reinterpret_cast<const C2S_MOVE*>(header);
-		// std::cout << "Move packet from server: x=" << moveResponse->x
-		// 		  << " y=" << moveResponse->y << std::endl;
 	} else if (header->id == static_cast<uint16_t>(C2S_PACKET_ID::CHAT)) {
-		// const C2S_CHAT* chatResponse =
-		// 	reinterpret_cast<const C2S_CHAT*>(header);
-		// std::cout << "Chat packet from server: message="
-		// 		  << std::string_view(chatResponse->message,
-		// 							  header->size - sizeof(PACKET_HEADER))
-		// 		  << std::endl;
 	} else {
-		NetUtils::PrintError("Unknown packet ID received.");
+		LOG_WARN("Unknown packet ID received.");
 		return false;
 	}
 
@@ -110,24 +95,24 @@ extern C2S_CHAT chatPacket;
 void Client::ThreadFunc(int i) {
 	for (int j = 0; j < 100; ++j) {
 		if (!SendPacket(&chatPacket.header)) {
-			NetUtils::PrintError("Failed to send packet to server.");
+			LOG_WARN("Failed to send packet to server.");
 			break;
 		}
 
 		if (!ReceiveByte(buffer_, sizeof(PACKET_HEADER))) {
-			NetUtils::PrintError("Failed to receive packet from server.");
+			LOG_WARN("Failed to receive packet from server.");
 			break;
 		}
 
 		PACKET_HEADER* header = reinterpret_cast<PACKET_HEADER*>(buffer_);
 		if (!ReceiveByte(buffer_ + sizeof(PACKET_HEADER),
 						 header->size - sizeof(PACKET_HEADER))) {
-			NetUtils::PrintError("Failed to receive full packet from server.");
+			LOG_WARN("Failed to receive full packet from server.");
 			break;
 		}
 
 		if (!HandlePacket(header)) {
-			NetUtils::PrintError("Failed to handle packet from server.");
+			LOG_WARN("Failed to handle packet from server.");
 			break;
 		}
 	}

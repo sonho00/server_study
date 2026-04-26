@@ -2,8 +2,6 @@
 
 #include <WinSock2.h>
 
-#include <string>
-
 #include "IocpCore.hpp"
 #include "Network/Common/NetUtils.hpp"
 #include "OverlappedEx.hpp"
@@ -15,22 +13,20 @@ Listener::Listener(IocpCore* iocpCore, const uint16_t port,
 	: iocpCore_(iocpCore), port_(port), acceptEx_(acceptEx) {
 	socket_ = ServerUtils::CreateListenSocket(port_);
 	if (socket_ == INVALID_SOCKET) {
-		throw std::runtime_error("Failed to create listen socket");
+		LOG_FATAL("Failed to create listen socket");
 	}
 
 	int opt = 1;
 	if (setsockopt(socket_, SOL_SOCKET, SO_REUSEADDR, (const char*)&opt,
 				   sizeof(opt)) == SOCKET_ERROR) {
 		int errorCode = WSAGetLastError();
-		throw std::runtime_error("setsockopt(SO_REUSEADDR) failed: " +
-								 std::to_string(errorCode));
+		LOG_ERROR("setsockopt(SO_REUSEADDR) failed: {}", errorCode);
 	}
 
 	int tcp_opt = 1;
 	if (setsockopt(socket_, IPPROTO_TCP, TCP_NODELAY, (const char*)&tcp_opt,
 				   sizeof(tcp_opt)) == SOCKET_ERROR) {
-		throw std::runtime_error("setsockopt TCP_NODELAY failed: " +
-								 std::to_string(WSAGetLastError()));
+		LOG_ERROR("setsockopt(TCP_NODELAY) failed: {}", WSAGetLastError());
 	}
 
 	acceptOv.ioType_ = IO_TYPE::ACCEPT;
@@ -38,8 +34,7 @@ Listener::Listener(IocpCore* iocpCore, const uint16_t port,
 	acceptOv.wsaBuf_.len = static_cast<ULONG>(acceptOv.buffer_.GetSize()) - 1;
 
 	if (!iocpCore_->Register(socket_, reinterpret_cast<ULONG_PTR>(this))) {
-		throw std::runtime_error(
-			"Failed to register listener socket with IOCP");
+		LOG_FATAL("Failed to register listener socket with IOCP");
 	}
 }
 
@@ -60,12 +55,13 @@ bool Listener::HandleAccept(const OverlappedEx* overlappedEx) {
 	if (setsockopt(session->socket_, SOL_SOCKET, SO_UPDATE_ACCEPT_CONTEXT,
 				   reinterpret_cast<const char*>(&socket_),
 				   sizeof(socket_)) == SOCKET_ERROR) {
-		NetUtils::PrintError("setsockopt failed");
+		LOG_ERROR("setsockopt(SO_UPDATE_ACCEPT_CONTEXT) failed: {}",
+				  WSAGetLastError());
 		return false;
 	}
 
 	if (!session->RegisterRead()) {
-		NetUtils::PrintError("Failed to post initial read");
+		LOG_ERROR("Failed to post initial read");
 		session->Close();
 		return false;
 	}
@@ -77,15 +73,12 @@ bool Listener::PostAccept() {
 	SOCKET hAcceptSocket = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, NULL, 0,
 									 WSA_FLAG_OVERLAPPED);
 	if (hAcceptSocket == INVALID_SOCKET) {
-		NetUtils::PrintError("Failed to create accept socket");
+		LOG_ERROR("Failed to create accept socket");
 		return false;
 	}
 
 	std::shared_ptr<Session> session = iocpCore_->sessionPool_.Acquire();
-	if (!session) {
-		// NetUtils::PrintError("Failed to get session from pool");
-		return false;
-	}
+	if (!session) return false;
 
 	session->readOv.ioType_ = IO_TYPE::ACCEPT;
 	session->readOv.wsaBuf_.buf = session->readOv.buffer_.GetBuffer();
@@ -95,7 +88,7 @@ bool Listener::PostAccept() {
 
 	if (!iocpCore_->Register(hAcceptSocket,
 							 reinterpret_cast<ULONG_PTR>(session.get()))) {
-		NetUtils::PrintError("Failed to register accept socket with IOCP");
+		LOG_ERROR("Failed to register accept socket with IOCP");
 		session->Close();
 		return false;
 	}
@@ -109,7 +102,7 @@ bool Listener::PostAccept() {
 	if (!result) {
 		int errorCode = WSAGetLastError();
 		if (errorCode != ERROR_IO_PENDING) {
-			NetUtils::PrintError("AcceptEx failed");
+			LOG_ERROR("AcceptEx failed: {}", errorCode);
 			session->Close();
 			return false;
 		}

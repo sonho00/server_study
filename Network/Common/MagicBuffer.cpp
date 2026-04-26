@@ -1,28 +1,32 @@
 #include "MagicBuffer.hpp"
 
-#include <stdexcept>
-
 #include "Network/Common/NetUtils.hpp"
 
 MagicBuffer::MagicBuffer(const size_t size) : size_(size) {
 	SYSTEM_INFO sysInfo;
 	GetSystemInfo(&sysInfo);
 	if (size_ % sysInfo.dwAllocationGranularity != 0) {
-		NetUtils::PrintError(
-			"Buffer size must be a multiple of the system's allocation "
-			"granularity");
-		throw std::runtime_error("Invalid buffer size");
+		LOG_FATAL(
+			"Buffer size must be a multiple of system allocation granularity "
+			"({} bytes)",
+			sysInfo.dwAllocationGranularity);
 	}
 
 	// 1. 페이지 파일 매핑 객체 생성
 	hMap_ = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0,
 							  static_cast<DWORD>(size_), NULL);
-	if (!hMap_) throw std::runtime_error("Failed to create file mapping");
+	if (!hMap_) {
+		LOG_FATAL("Failed to create file mapping: {}", GetLastError());
+	}
 
 	// 2. 연속된 가상 주소 공간을 2배 크기로 예약
 	void* ptr = static_cast<char*>(
 		VirtualAlloc(NULL, size_ * 2, MEM_RESERVE, PAGE_NOACCESS));
-	if (!ptr) throw std::runtime_error("Failed to reserve virtual memory");
+	if (!ptr) {
+		CloseHandle(hMap_);
+		LOG_FATAL("Failed to reserve virtual address space: {}",
+				  GetLastError());
+	}
 
 	VirtualFree(ptr, 0, MEM_RELEASE);
 
@@ -30,13 +34,15 @@ MagicBuffer::MagicBuffer(const size_t size) : size_(size) {
 
 	// 3. 예약된 주소 공간의 앞부분(0 ~ size)에 물리 메모리 매핑
 	if (!MapViewOfFileEx(hMap_, FILE_MAP_ALL_ACCESS, 0, 0, size_, buffer_)) {
-		throw std::runtime_error("Failed to map view of file to first half");
+		LOG_FATAL("Failed to map view of file to first half: {}",
+				  GetLastError());
 	}
 
 	// 4. 예약된 주소 공간의 뒷부분(size ~ 2*size)에 동일한 물리 메모리 매핑
 	if (!MapViewOfFileEx(hMap_, FILE_MAP_ALL_ACCESS, 0, 0, size_,
 						 buffer_ + size_)) {
-		throw std::runtime_error("Failed to map view of file to second half");
+		LOG_FATAL("Failed to map view of file to second half: {}",
+				  GetLastError());
 	}
 }
 

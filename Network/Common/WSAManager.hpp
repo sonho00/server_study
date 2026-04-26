@@ -9,8 +9,7 @@ class WSAManager {
 	WSAManager() {
 		WSADATA wsaData;
 		if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
-			NetUtils::PrintError("WSAStartup failed");
-			exit(1);
+			LOG_FATAL("WSAStartup failed: {}", WSAGetLastError());
 		}
 	}
 

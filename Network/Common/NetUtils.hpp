@@ -2,13 +2,89 @@
 
 #include <WinSock2.h>
 
+#include <chrono>
+#include <format>
 #include <iostream>
+#include <source_location>
+#include <stdexcept>
 #include <string>
+#include <string_view>
+
+#define LOG_DEBUG(fmt, ...) \
+	NetUtils::LogInfo(NetUtils::LogLevel::Debug, fmt, ##__VA_ARGS__)
+#define LOG_INFO(fmt, ...) \
+	NetUtils::LogInfo(NetUtils::LogLevel::Info, fmt, ##__VA_ARGS__)
+#define LOG_WARN(fmt, ...) \
+	NetUtils::LogInfo(NetUtils::LogLevel::Warn, fmt, ##__VA_ARGS__)
+#define LOG_ERROR(fmt, ...)                            \
+	NetUtils::LogError(NetUtils::LogLevel::Error, fmt, \
+					   std::source_location::current(), ##__VA_ARGS__)
+#define LOG_FATAL(fmt, ...)                            \
+	NetUtils::LogError(NetUtils::LogLevel::Fatal, fmt, \
+					   std::source_location::current(), ##__VA_ARGS__)
 
 namespace NetUtils {
-inline void PrintError(const char* msg, int errorCode = WSAGetLastError()) {
-	std::string s =
-		std::string(msg) + " Error Code: " + std::to_string(errorCode) + "\n";
-	std::cerr << s;
+enum class LogLevel { Debug, Info, Warn, Error, Fatal };
+inline LogLevel gLogLevel = LogLevel::Debug;
+
+inline std::string_view GetLevelStr(LogLevel level) {
+	switch (level) {
+		case LogLevel::Debug:
+			return "\033[36mDEBUG\033[0m";	// Cyan
+		case LogLevel::Info:
+			return "\033[32mINFO \033[0m";	// Green
+		case LogLevel::Warn:
+			return "\033[33mWARN \033[0m";	// Yellow
+		case LogLevel::Error:
+			return "\033[31mERROR\033[0m";	// Red
+		case LogLevel::Fatal:
+			return "\033[1;31mFATAL\033[0m";  // Bold Red
+		default:
+			return "NONE";
+	}
+}
+
+template <typename... Args>
+inline void LogInfo(LogLevel level, std::string_view fmt_str, Args&&... args) {
+	try {
+		if (level < gLogLevel) return;
+		auto now = std::chrono::system_clock::now();
+		auto localTime = std::chrono::current_zone()->to_local(now);
+		std::string msg = std::vformat(fmt_str, std::make_format_args(args...));
+
+		std::cout << std::format("[{:%F %X}][{}] {}\n", localTime,
+								 GetLevelStr(level), msg);
+
+		if (level == LogLevel::Fatal) {
+			throw std::runtime_error(msg);
+		}
+	} catch (const std::format_error& e) {
+		std::cerr << "[Format Error] " << e.what() << std::endl;
+	}
+}
+
+template <typename... Args>
+inline void LogError(
+	LogLevel level, std::string_view fmt_str,
+	std::source_location location = std::source_location::current(),
+	Args&&... args) {
+	auto now = std::chrono::system_clock::now();
+	auto localTime = std::chrono::current_zone()->to_local(now);
+	try {
+		std::string msg = std::vformat(fmt_str, std::make_format_args(args...));
+
+		std::cerr << std::format("[{:%F %X}][{}][{}:{}] {}\n", localTime,
+								 GetLevelStr(level), location.file_name(),
+								 location.line(), msg);
+
+		if (level == LogLevel::Fatal) {
+			throw std::runtime_error(msg);
+		}
+	} catch (const std::format_error& e) {
+		std::cerr << std::format("[{:%F %X}][{}][{}:{}] [Format Error] {}\n",
+								 localTime, GetLevelStr(level),
+								 location.file_name(), location.line(),
+								 e.what());
+	}
 }
 }  // namespace NetUtils

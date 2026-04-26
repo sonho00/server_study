@@ -20,7 +20,8 @@ class ServerService {
 
 		for (int i = 0; i < 2000; ++i) {
 			if (!listener_.PostAccept()) {
-				NetUtils::PrintError("Failed to post initial accept");
+				LOG_ERROR("Failed to post initial accept");
+				break;
 			}
 		}
 	}

@@ -1,9 +1,11 @@
 #include <Winsock2.h>
+#include <ws2tcpip.h>
 
 #include <iostream>
 #include <thread>
 
 #include "../Common/NetUtils.hpp"
+#include "Network/Common/WSAManager.hpp"
 
 #pragma comment(lib, "ws2_32.lib")
 
@@ -12,43 +14,48 @@ void handleClient(SOCKET clientSocket) {
 	while (true) {
 		int bytesReceived = recv(clientSocket, buffer, sizeof(buffer), 0);
 		if (bytesReceived > 0) {
-			send(clientSocket, buffer, bytesReceived, 0);
+			if (send(clientSocket, buffer, bytesReceived, 0) == SOCKET_ERROR) {
+				LOG_ERROR("send failed: {}", WSAGetLastError());
+				break;
+			} else if (bytesReceived == 0) {
+				// 클라이언트 연결 종료
+				LOG_INFO("Connection closed by client.");
+				break;
+			} else {
+				LOG_ERROR("recv failed: {}", WSAGetLastError());
+				break;
+			}
 		} else if (bytesReceived == 0) {
 			// 클라이언트 연결 종료
+			LOG_INFO("Connection closed by client.");
 			break;
 		} else {
-			NetUtils::PrintError("recv failed");
+			LOG_ERROR("recv failed: {}", WSAGetLastError());
 			break;
 		}
 	}
-	
+
 	closesocket(clientSocket);
 }
 
 int main() {
-	std::cout << "Starting echo server..." << std::endl;
+	LOG_INFO("Starting echo server on port 8080...");
 
-	WSAData wsaData;
-	if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
-		NetUtils::PrintError("WSAStartup failed");
-		return 1;
-	}
+	WSAManager wsaManager;
 
-	std::cout << "Echo server started on port 8080..." << std::endl;
+	LOG_INFO("WSA initialized successfully.");
 
 	SOCKET listenSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 	if (listenSocket == INVALID_SOCKET) {
-		NetUtils::PrintError("socket failed");
-		WSACleanup();
-		return 1;
+		LOG_FATAL("socket failed: {}", WSAGetLastError());
 	}
 
 	int opt = 1;
 	if (setsockopt(listenSocket, SOL_SOCKET, SO_REUSEADDR, (const char*)&opt,
 				   sizeof(opt)) == SOCKET_ERROR) {
-		NetUtils::PrintError("setsockopt failed");
+		LOG_ERROR("setsockopt(SO_REUSEADDR) failed: {}", WSAGetLastError());
 	}
-	std::cout << "Socket created successfully." << std::endl;
+	LOG_INFO("Socket options set successfully.");
 
 	sockaddr_in serverAddr;
 	serverAddr.sin_family = AF_INET;
@@ -56,22 +63,16 @@ int main() {
 	serverAddr.sin_port = htons(8080);
 	if (bind(listenSocket, (sockaddr*)&serverAddr, sizeof(serverAddr)) ==
 		SOCKET_ERROR) {
-		NetUtils::PrintError("bind failed");
-		closesocket(listenSocket);
-		WSACleanup();
-		return 1;
+		LOG_FATAL("bind failed: {}", WSAGetLastError());
 	}
 
-	std::cout << "Socket bound to port 8080." << std::endl;
+	LOG_INFO("Socket bound to port 8080.");
 
 	if (listen(listenSocket, SOMAXCONN) == SOCKET_ERROR) {
-		NetUtils::PrintError("listen failed");
-		closesocket(listenSocket);
-		WSACleanup();
-		return 1;
+		LOG_FATAL("listen failed: {}", WSAGetLastError());
 	}
 
-	std::cout << "Listening for incoming connections..." << std::endl;
+	LOG_INFO("Socket is listening for incoming connections.");
 
 	std::thread serverThread([&]() {
 		while (true) {
@@ -80,9 +81,13 @@ int main() {
 			SOCKET clientSocket =
 				accept(listenSocket, (sockaddr*)&clientAddr, &clientAddrSize);
 
-			if (clientSocket == INVALID_SOCKET) {
-				NetUtils::PrintError("accept failed");
-				continue;
+			if (clientSocket != INVALID_SOCKET) {
+				char ip[INET_ADDRSTRLEN];
+				InetNtop(AF_INET, &clientAddr.sin_addr, ip, sizeof(ip));
+				LOG_INFO("Accepted connection from {}:{}", ip,
+						 ntohs(clientAddr.sin_port));
+			} else {
+				LOG_ERROR("accept failed: {}", WSAGetLastError());
 			}
 
 			std::thread clientThread(handleClient, clientSocket);
@@ -91,13 +96,13 @@ int main() {
 	});
 
 	// 유저의 종료 신호를 기다립니다. 예: Enter 키
-	std::cout << "Press Enter to stop the server..." << std::endl;
+	LOG_INFO("Press Enter to stop the server...");
 	std::cin.get();
+	LOG_INFO("Server is shutting down...");
 
 	closesocket(listenSocket);
-	WSACleanup();
 
-	std::cout << "Echo server stopped." << std::endl;
+	LOG_INFO("Echo server stopped.");
 
 	return 0;
 }

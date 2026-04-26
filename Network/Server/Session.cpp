@@ -3,7 +3,6 @@
 #include <WinSock2.h>
 
 #include <cstring>
-#include <string>
 
 #include "Network/Common/NetUtils.hpp"
 #include "Network/Common/Protocol.hpp"
@@ -19,10 +18,16 @@ bool Session::RegisterRead() {
 	int recvResult = WSARecv(socket_, &readOv.wsaBuf_, 1, NULL, &flags,
 							 &readOv.overlapped_, NULL);
 
+	LOG_DEBUG(
+		"[Session:{:#x}] Posted WSARecv - Overlapped: {} BufferPos:{}, "
+		"BufferLen:{}",
+		reinterpret_cast<size_t>(this), static_cast<void*>(&readOv.overlapped_),
+		readOv.writePos_, readOv.wsaBuf_.len);
+
 	if (recvResult == SOCKET_ERROR) {
 		int errorCode = WSAGetLastError();
 		if (errorCode != ERROR_IO_PENDING) {
-			NetUtils::PrintError("WSARecv failed", errorCode);
+			LOG_ERROR("WSARecv failed: {}", errorCode);
 			Close();
 			return false;
 		}
@@ -42,10 +47,17 @@ bool Session::RegisterWrite() {
 	int sendResult = WSASend(socket_, &writeOv.wsaBuf_, 1, NULL, flags,
 							 &writeOv.overlapped_, NULL);
 
+	LOG_DEBUG(
+		"[Session:{:#x}] Posted WSASend - Overlapped: {} BufferPos:{}, "
+		"BufferLen:{}",
+		reinterpret_cast<size_t>(this),
+		static_cast<void*>(&writeOv.overlapped_), writeOv.readPos_,
+		writeOv.wsaBuf_.len);
+
 	if (sendResult == SOCKET_ERROR) {
 		int errorCode = WSAGetLastError();
 		if (errorCode != ERROR_IO_PENDING) {
-			NetUtils::PrintError("WSASend failed", errorCode);
+			LOG_ERROR("WSASend failed: {}", errorCode);
 			Close();
 			return false;
 		}
@@ -67,7 +79,7 @@ bool Session::SendPacket(const char* packet) {
 		isSending_ = true;
 
 		if (!RegisterWrite()) {
-			NetUtils::PrintError("Failed to post another write");
+			LOG_ERROR("Failed to post another write");
 			return false;
 		}
 	}
@@ -78,7 +90,7 @@ bool Session::SendPacket(const char* packet) {
 bool Session::OnRead(const DWORD bytesTransferred) {
 	if (readOv.writePos_ - readOv.readPos_ + bytesTransferred >
 		readOv.buffer_.GetSize()) {
-		NetUtils::PrintError("]Read buffer overflow detected");
+		LOG_ERROR("Read buffer overflow detected");
 		Close();
 		return false;
 	}
@@ -86,25 +98,23 @@ bool Session::OnRead(const DWORD bytesTransferred) {
 	readOv.writePos_ += bytesTransferred;
 
 	while (true) {
-		size_t avilableData = readOv.writePos_ - readOv.readPos_;
-		if (avilableData < sizeof(PACKET_HEADER)) break;
+		size_t availableData = readOv.writePos_ - readOv.readPos_;
+		if (availableData < sizeof(PACKET_HEADER)) break;
 
 		PACKET_HEADER* header = reinterpret_cast<PACKET_HEADER*>(
 			readOv.buffer_.GetBuffer() + readOv.readPos_);
 
 		if (header->size == 0 || header->size > readOv.buffer_.GetSize()) {
-			NetUtils::PrintError("Invalid packet size");
+			LOG_ERROR("Invalid packet size: {}", header->size);
 			Close();
 			return false;
 		}
 
-		if (avilableData < header->size) break;
+		if (availableData < header->size) break;
 
 		if (!PacketHandler::Execute(this, header)) {
-			NetUtils::PrintError(
-				("Failed to handle packet with ID: " +
-				 std::to_string(static_cast<uint16_t>(header->id)))
-					.c_str());
+			LOG_ERROR("Failed to handle packet with ID: {}",
+					  static_cast<uint16_t>(header->id));
 			Close();
 			return false;
 		}
@@ -118,7 +128,7 @@ bool Session::OnRead(const DWORD bytesTransferred) {
 	}
 
 	if (!RegisterRead()) {
-		NetUtils::PrintError("Failed to post another read");
+		LOG_ERROR("Failed to post another read");
 		return false;
 	}
 
@@ -131,7 +141,7 @@ bool Session::OnWrite(const DWORD bytesTransferred) {
 	std::lock_guard<std::mutex> lock(mtx);
 	if (writeOv.writePos_ - writeOv.readPos_ + bytesTransferred >
 		writeOv.buffer_.GetSize()) {
-		NetUtils::PrintError("Write buffer overflow detected");
+		LOG_ERROR("Write buffer overflow detected");
 		Close();
 		return false;
 	}
@@ -149,7 +159,7 @@ bool Session::OnWrite(const DWORD bytesTransferred) {
 	}
 
 	if (!RegisterWrite()) {
-		NetUtils::PrintError("Failed to post another write");
+		LOG_ERROR("Failed to post another write");
 		return false;
 	}
 
@@ -163,7 +173,7 @@ bool Session::HandleIO(OverlappedEx* ovEx, const DWORD bytesTransferred) {
 		case IO_TYPE::SEND:
 			return OnWrite(bytesTransferred);
 		default:
-			NetUtils::PrintError("Unknown IO type");
+			LOG_ERROR("Unknown IO type");
 			return false;
 	}
 }

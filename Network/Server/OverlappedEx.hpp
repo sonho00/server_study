@@ -2,8 +2,6 @@
 
 #include <WinSock2.h>
 
-#include <atomic>
-
 #include "Network/Common/MagicBuffer.hpp"
 #include "Network/Common/Protocol.hpp"
 
