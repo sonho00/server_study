@@ -1,0 +1,27 @@
+#include <Winsock2.h>
+
+#include <thread>
+
+#include "01_Mice.hpp"
+#include "Network/Common/WSAManager.hpp"
+
+#pragma comment(lib, "ws2_32.lib")
+
+int main() {
+	WSAManager wsaManager;
+
+	LOG_INFO("Test client started.");
+
+	const char* serverIp = "127.0.0.1";
+	uint16_t serverPort = 8080;
+	Mice mice(serverIp, serverPort);
+	std::thread clientThread(&Mice::ThreadFunc, &mice);
+
+	// 유저의 종료 신호를 기다립니다. 예: Enter 키
+	LOG_INFO("Press Enter to stop the client...");
+	std::cin.get();
+
+	LOG_INFO("Test client stopped.");
+
+	return 0;
+}
