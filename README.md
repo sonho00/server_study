@@ -1,20 +1,20 @@
-**Server Study**
+## Server Study
 
 본 저장소는 게임 서버의 기초를 학습하는 과정을 기록합니다.
 
 <br>
 
-**1. Task Scheduler**
+### 1. Task Scheduler
 
 주어진 태스크를 최적의 스레드에 배정하여 태스크를 최적화.
 
 <br>
 
-성능 측정 데이터 (Benchmark)
+##### 성능 측정 데이터 (Benchmark)
 
-동일 조건의 태스크 실행 시간 비교 (단위: `ms`)
+##### 동일 조건의 태스크 실행 시간 비교 (단위: `ms`)
 
-(1) `Central Queue`
+#### (1) `Central Queue`
 ```
 Avg : 754.093ms
 Min : 714.692ms
@@ -23,7 +23,7 @@ Min : 714.692ms
 
 <br>
 
-(2) `Local Queue`
+#### (2) `Local Queue`
 ```
 Avg : 821.981ms
 Min : 763.293ms
@@ -32,7 +32,7 @@ Min : 763.293ms
 
 <br>
 
-(3) `Work Stealing`
+#### (3) `Work Stealing`
 ```
 Avg : 736.806ms
 Min : 695.875ms
@@ -41,7 +41,7 @@ Min : 695.875ms
 
 <br>
 
-(4) `Batch Processing`
+#### (4) `Batch Processing`
 
 태스크 구성 변경으로 중앙큐 재측정
 ```
@@ -52,7 +52,7 @@ Central Queue  Avg 1757.729ms / Min 1666.661ms
 
 <br>
 
-분석 회고
+##### 분석 회고
 
 중앙큐를 압도하는 스케줄링 방법은 찾지 못함.
 
@@ -60,7 +60,7 @@ Central Queue  Avg 1757.729ms / Min 1666.661ms
 
 <br>
 
-원인 분석
+##### 원인 분석
 
 태스크 초기 배치 전략: 현재 모든 태스크를 중앙 큐에 주입한 뒤 스레드가 가져가는 구조를 취하고 있음.
 
@@ -68,7 +68,7 @@ Central Queue  Avg 1757.729ms / Min 1666.661ms
 
 <br>
 
-**To-do List**
+#### To-do List
 
 (1) `Tracy` 등의 Profiler를 사용해 실제로 병목이 발생하는 지점을 확인.
 
@@ -76,7 +76,7 @@ Central Queue  Avg 1757.729ms / Min 1666.661ms
 
 <br>
 
-**2. Network**
+### 2. Network
 
 게임 서버 기능을 구현하면서 학습하는 과정.
 
@@ -92,7 +92,7 @@ Central Queue  Avg 1757.729ms / Min 1666.661ms
 
 <br>
 
-**To-do List**
+#### To-do List
 
 (1) 패킷 조립, 버퍼 오버플로우 처리, `race condition` 제거 등 현재까지의 구현이 정확한지 검증.
 
@@ -112,12 +112,11 @@ Global Broadcast: 전체 세션 리스트를 순회하며 메시지를 전파하
 
 <br>
 
-**3. Major Troubleshooting**
+### 3. Major Troubleshooting
 
 학습 과정 중 발생한 고난도 버그와 그 해결 과정을 기록합니다.
 
 <br>
-
 
 [트러블슈팅: 로그 지연으로 인한 핸들 파괴 분석](./Troubleshooting.md)
 
@@ -129,7 +128,20 @@ Global Broadcast: 전체 세션 리스트를 순회하며 메시지를 전파하
 
 <br>
 
-Environment & Build Stack
+### 4. Build System
+| 명령어 | 기능 및 동작 |
+| :--- | :--- |
+| `make all` | 서버, 클라이언트 및 모든 테스트 모듈을 일괄 빌드 |
+| `make server` | 서버 실행 파일 빌드 |
+| `make run-server` | 서버 빌드 후 즉시 실행 |
+| `make client` | 클라이언트 실행 파일 빌드 |
+| `make run-client` | 클라이언트 빌드 후 즉시 실행 |
+| `make test-NN` | `Tests/NN_...` 폴더를 자동 탐색하여 해당 모듈 빌드 후 실행 |
+| `make clean` | 빌드 결과물(`bin/`) 폴더 강제 삭제 및 환경 초기화 |
+
+<br>
+
+#### Environment & Build Stack
 ```
 
 CPU: 8-Core / 16-Logical Processors
@@ -138,4 +150,5 @@ OS: Windows (MinGW-w64)
 Compiler: GCC (MinGW-w64)
 Optimization: -O3
 C++ Standard: C++20
+Build Tool: GNU Make 4.4.1
 ```
