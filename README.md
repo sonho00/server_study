@@ -58,6 +58,14 @@
     (4) DisconnectEx: 세션 종료 및 소켓 자원 회수를 비동기화하여 안정성 강화.
     (5) Engine Integration: 구현된 Task Scheduler와 IOCP 네트워크 레이어를 결합하여 완전한 비동기 서버 엔진으로 통합.
 
+    3. Major Troubleshooting
+    학습 과정 중 발생한 고난도 버그와 그 해결 과정을 기록합니다.
+
+    [트러블슈팅: 로그 지연으로 인한 핸들 파괴 분석](./Troubleshooting.md)
+    문제: AcceptEx 도입 후, 로그 포맷만 바꿨는데 WSARecv에서 커널 에러(코드 3)가 발생하는 기현상 발생.
+    원인: std::chrono::current_zone()의 오버헤드가 네트워크 루프의 Critical Path를 방해하여 OS가 소켓 핸들 통로를 무효화함.
+    해결: git bisect를 통해 범인을 특정하고, 로깅 로직을 경량화하여 타이밍 이슈 해결.
+
     Environment & Build Stack
     CPU: 8-Core / 16-Logical Processors
     RAM: 32GB
