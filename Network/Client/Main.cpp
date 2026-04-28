@@ -16,7 +16,7 @@ C2S_MOVE movePacket;
 C2S_CHAT chatPacket;
 
 int main(int argc, char* argv[]) {
-	int clientCount = argc > 1 ? std::stoi(argv[1]) : 1000;
+	int clientCount = argc > 1 ? std::stoi(argv[1]) : 16;
 
 	LOG_INFO("Starting echo client with {} clients...", clientCount);
 

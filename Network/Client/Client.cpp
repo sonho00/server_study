@@ -110,7 +110,7 @@ bool Client::HandlePacket(const PACKET_HEADER& header) {
 extern C2S_MOVE movePacket;
 extern C2S_CHAT chatPacket;
 void Client::ThreadFunc(int i) {
-	for (int j = 0; j < 100; ++j) {
+	for (int j = 0; j < 3; ++j) {
 		if (!SendPacket(chatPacket.header)) {
 			LOG_WARN("Failed to send packet to server.");
 			break;

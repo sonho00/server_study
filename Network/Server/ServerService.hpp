@@ -18,7 +18,7 @@ class ServerService {
 		int numThreads = std::thread::hardware_concurrency();
 		iocpCore_->Start(numThreads);
 
-		for (int i = 0; i < 2000; ++i) {
+		for (int i = 0; i < 16; ++i) {
 			if (!listener_.PostAccept()) {
 				LOG_ERROR("Failed to post initial accept");
 				break;
