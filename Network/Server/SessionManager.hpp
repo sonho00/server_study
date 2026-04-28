@@ -8,7 +8,7 @@
 #include "Network/Common/ObjectPool.hpp"
 #include "Session.hpp"
 
-class SessionManager : public std::enable_shared_from_this<SessionManager> {
+class SessionManager {
    public:
 	std::shared_ptr<Session> CreateSession();
 	void AddSession(std::shared_ptr<Session> session);

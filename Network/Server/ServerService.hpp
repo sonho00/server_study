@@ -6,17 +6,17 @@
 #include "Listener.hpp"
 #include "Network/Common/NetUtils.hpp"
 #include "Network/Common/WSAManager.hpp"
+#include "Network/Server/SessionManager.hpp"
 #include "ServerUtils.hpp"
 
 class ServerService {
    public:
 	ServerService()
-		: iocpCore_(std::make_unique<IocpCore>()),
-		  listener_(*iocpCore_, 8080, netFuncs_.AcceptEx) {}
+		: listener_(iocpCore_, sessionManager_, 8080, netFuncs_.AcceptEx) {}
 
 	bool Start() {
 		int numThreads = std::thread::hardware_concurrency();
-		if(!iocpCore_->Start(numThreads)) {
+		if (!iocpCore_.Start(numThreads)) {
 			LOG_FATAL("Failed to start IOCP worker threads");
 		}
 
@@ -33,6 +33,7 @@ class ServerService {
    private:
 	WSAManager wsaManager_;
 	ServerUtils::NetFuncs netFuncs_;
-	std::unique_ptr<IocpCore> iocpCore_;
+	IocpCore iocpCore_;
+	SessionManager sessionManager_;
 	Listener listener_;
 };

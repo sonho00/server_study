@@ -6,7 +6,6 @@ std::shared_ptr<Session> SessionManager::CreateSession() {
 		return nullptr;
 	}
 
-	session->SetSessionManager(shared_from_this());
 	return session;
 }
 

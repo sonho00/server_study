@@ -8,11 +8,12 @@
 #include "OverlappedEx.hpp"
 
 class IocpCore;
+class SessionManager;
 
 class Listener {
    public:
-	Listener(IocpCore& iocpCore, const uint16_t port,
-			 const LPFN_ACCEPTEX acceptEx = nullptr);
+	Listener(IocpCore& iocpCore, SessionManager& sessionManager,
+			 const uint16_t port, const LPFN_ACCEPTEX acceptEx = nullptr);
 	~Listener();
 
 	bool HandleAccept(const OverlappedEx& ovEx);
@@ -23,6 +24,7 @@ class Listener {
 	SOCKET socket_ = INVALID_SOCKET;
 
 	IocpCore& iocpCore_;
+	SessionManager& sessionManager_;
 	const uint16_t port_;
 	LPFN_ACCEPTEX acceptEx_;
 };

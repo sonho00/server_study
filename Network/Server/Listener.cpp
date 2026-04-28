@@ -6,11 +6,14 @@
 #include "Network/Common/NetUtils.hpp"
 #include "OverlappedEx.hpp"
 #include "ServerUtils.hpp"
-#include "Session.hpp"
+#include "SessionManager.hpp"
 
-Listener::Listener(IocpCore& iocpCore, const uint16_t port,
-				   LPFN_ACCEPTEX acceptEx)
-	: iocpCore_(iocpCore), port_(port), acceptEx_(acceptEx) {
+Listener::Listener(IocpCore& iocpCore, SessionManager& sessionManager,
+				   const uint16_t port, LPFN_ACCEPTEX acceptEx)
+	: iocpCore_(iocpCore),
+	  sessionManager_(sessionManager),
+	  port_(port),
+	  acceptEx_(acceptEx) {
 	socket_ = ServerUtils::CreateListenSocket(port_);
 	if (socket_ == INVALID_SOCKET) {
 		LOG_FATAL("Failed to create listen socket");
@@ -73,7 +76,7 @@ bool Listener::PostAccept() {
 		return false;
 	}
 
-	std::shared_ptr<Session> session = iocpCore_.sessionPool_.Acquire();
+	std::shared_ptr<Session> session = sessionManager_.CreateSession();
 	if (!session) return false;
 
 	session->readOv.ioType_ = IO_TYPE::ACCEPT;
@@ -83,7 +86,7 @@ bool Listener::PostAccept() {
 	session->socket_ = hAcceptSocket;
 
 	if (!iocpCore_.Register(hAcceptSocket,
-							 reinterpret_cast<ULONG_PTR>(session.get()))) {
+							reinterpret_cast<ULONG_PTR>(session.get()))) {
 		LOG_ERROR("Failed to register accept socket with IOCP");
 		session->Close();
 		return false;

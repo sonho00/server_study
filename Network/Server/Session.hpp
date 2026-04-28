@@ -29,12 +29,6 @@ class Session : public PoolElement<Session> {
 
 	void Close();
 
-	void SetSessionManager(const std::shared_ptr<SessionManager>& sessionManager) {
-		sessionManager_ = sessionManager;
-	}
-	std::shared_ptr<SessionManager> GetSessionManager() const {
-		return sessionManager_.lock();
-	}
 	size_t GetSessionId() const { return sessionId_; }
 	void SetSessionId(const size_t sessionId) { sessionId_ = sessionId; }
 
@@ -43,7 +37,6 @@ class Session : public PoolElement<Session> {
 	SOCKET socket_ = INVALID_SOCKET;
 
    private:
-	std::weak_ptr<SessionManager> sessionManager_;
 	size_t sessionId_ = 0;
 	std::mutex mtx;
 	bool isSending_ = false;
