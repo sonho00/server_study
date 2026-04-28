@@ -2,6 +2,7 @@
 
 #include <WinSock2.h>
 
+#include <thread>
 #include <vector>
 
 #include "Network/Common/ObjectPool.hpp"
@@ -18,8 +19,8 @@ class IocpCore {
 	ObjectPool<Session, 4096> sessionPool_;
 
    private:
-	static DWORD WINAPI WorkerThread(LPVOID lpParam);
+	void WorkerThread();
 
-	std::vector<HANDLE> threads_;
+	std::vector<std::thread> threads_;
 	HANDLE hIocp_;
 };

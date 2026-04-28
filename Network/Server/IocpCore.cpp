@@ -1,8 +1,10 @@
 #include "IocpCore.hpp"
 
 #include <WinSock2.h>
+#include <ioapiset.h>
 
 #include <memory>
+#include <thread>
 
 #include "Listener.hpp"
 #include "Network/Common/NetUtils.hpp"
@@ -17,16 +19,13 @@ IocpCore::IocpCore() {
 }
 
 IocpCore::~IocpCore() {
-	for (HANDLE thread : threads_) {
-		if (thread) {
-			PostQueuedCompletionStatus(hIocp_, 0, 0, NULL);
-		}
+	for (std::thread& thread : threads_) {
+		PostQueuedCompletionStatus(hIocp_, 0, 0, nullptr);
 	}
 
-	for (HANDLE thread : threads_) {
-		if (thread) {
-			WaitForSingleObject(thread, INFINITE);
-			CloseHandle(thread);
+	for (std::thread& thread : threads_) {
+		if (thread.joinable()) {
+			thread.join();
 		}
 	}
 
@@ -36,11 +35,11 @@ IocpCore::~IocpCore() {
 bool IocpCore::Start(const size_t threadCount) {
 	threads_.resize(threadCount);
 	for (size_t i = 0; i < threadCount; ++i) {
-		threads_[i] = CreateThread(NULL, 0, WorkerThread, this, 0, NULL);
-		if (threads_[i] == NULL) {
-			LOG_FATAL("Failed to create worker thread: {}", GetLastError());
+		threads_[i] = std::thread(&IocpCore::WorkerThread, this);
+		if (!threads_[i].joinable()) {
+			LOG_FATAL("Failed to create worker thread");
 			for (size_t j = 0; j < i; ++j) {
-				CloseHandle(threads_[j]);
+				PostQueuedCompletionStatus(hIocp_, 0, 0, nullptr);
 			}
 			return false;
 		}
@@ -59,15 +58,14 @@ bool IocpCore::Register(const SOCKET socket,
 	return true;
 }
 
-DWORD WINAPI IocpCore::WorkerThread(LPVOID lpParam) {
-	IocpCore* iocp = static_cast<IocpCore*>(lpParam);
+void IocpCore::WorkerThread() {
 	while (true) {
 		OVERLAPPED* pOverlapped = nullptr;
 		DWORD bytesTransferred = 0;
 		ULONG_PTR completionKey = 0;
 
 		BOOL result =
-			GetQueuedCompletionStatus(iocp->hIocp_, &bytesTransferred,
+			GetQueuedCompletionStatus(hIocp_, &bytesTransferred,
 									  &completionKey, &pOverlapped, INFINITE);
 
 		OverlappedEx* pOverlappedEx =
@@ -130,6 +128,4 @@ DWORD WINAPI IocpCore::WorkerThread(LPVOID lpParam) {
 			}
 		}
 	}
-
-	return 0;
 }
