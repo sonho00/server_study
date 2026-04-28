@@ -11,18 +11,18 @@ class IocpCore;
 
 class Listener {
    public:
-	Listener(IocpCore* iocpCore, const uint16_t port,
+	Listener(IocpCore& iocpCore, const uint16_t port,
 			 const LPFN_ACCEPTEX acceptEx = nullptr);
 	~Listener();
 
-	bool HandleAccept(const OverlappedEx* overlappedEx);
+	bool HandleAccept(const OverlappedEx& ovEx);
 	bool PostAccept();
 
    private:
 	OverlappedEx acceptOv;
 	SOCKET socket_ = INVALID_SOCKET;
 
-	IocpCore* iocpCore_ = nullptr;
-	const uint16_t port_ = 0;
-	LPFN_ACCEPTEX acceptEx_ = nullptr;
+	IocpCore& iocpCore_;
+	const uint16_t port_;
+	LPFN_ACCEPTEX acceptEx_;
 };

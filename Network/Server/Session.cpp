@@ -65,14 +65,12 @@ bool Session::RegisterWrite() {
 	return true;
 }
 
-bool Session::SendPacket(const char* packet) {
+bool Session::SendPacket(const PACKET_HEADER& header) {
 	std::lock_guard<std::mutex> lock(mtx);
 
-	const PACKET_HEADER* header =
-		reinterpret_cast<const PACKET_HEADER*>(packet);
-	memcpy(writeOv.buffer_.GetBuffer() + writeOv.writePos_, packet,
-		   header->size);
-	writeOv.writePos_ += header->size;
+	memcpy(writeOv.buffer_.GetBuffer() + writeOv.writePos_, &header,
+		   header.size);
+	writeOv.writePos_ += header.size;
 
 	if (!isSending_) {
 		isSending_ = true;
@@ -111,7 +109,7 @@ bool Session::OnRead(const DWORD bytesTransferred) {
 
 		if (availableData < header->size) break;
 
-		if (!PacketHandler::Execute(this, header)) {
+		if (!PacketHandler::Execute(*this, *header)) {
 			LOG_ERROR("Failed to handle packet with ID: {}",
 					  static_cast<uint16_t>(header->id));
 			Close();
@@ -165,8 +163,8 @@ bool Session::OnWrite(const DWORD bytesTransferred) {
 	return true;
 }
 
-bool Session::HandleIO(OverlappedEx* ovEx, const DWORD bytesTransferred) {
-	switch (ovEx->ioType_) {
+bool Session::HandleIO(OverlappedEx& ovEx, const DWORD bytesTransferred) {
+	switch (ovEx.ioType_) {
 		case IO_TYPE::RECV:
 			return OnRead(bytesTransferred);
 		case IO_TYPE::SEND:

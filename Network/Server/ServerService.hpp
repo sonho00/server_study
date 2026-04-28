@@ -12,18 +12,22 @@ class ServerService {
    public:
 	ServerService()
 		: iocpCore_(std::make_unique<IocpCore>()),
-		  listener_(iocpCore_.get(), 8080, netFuncs_.AcceptEx) {}
+		  listener_(*iocpCore_, 8080, netFuncs_.AcceptEx) {}
 
-	void Start() {
+	bool Start() {
 		int numThreads = std::thread::hardware_concurrency();
-		iocpCore_->Start(numThreads);
+		if(!iocpCore_->Start(numThreads)) {
+			LOG_FATAL("Failed to start IOCP worker threads");
+		}
 
 		for (int i = 0; i < 16; ++i) {
 			if (!listener_.PostAccept()) {
 				LOG_ERROR("Failed to post initial accept");
-				break;
+				return false;
 			}
 		}
+
+		return true;
 	}
 
    private:

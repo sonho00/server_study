@@ -60,18 +60,14 @@ bool IocpCore::Register(const SOCKET socket,
 
 void IocpCore::WorkerThread() {
 	while (true) {
-		OVERLAPPED* pOverlapped = nullptr;
+		OVERLAPPED* ov = nullptr;
 		DWORD bytesTransferred = 0;
 		ULONG_PTR completionKey = 0;
 
-		BOOL result =
-			GetQueuedCompletionStatus(hIocp_, &bytesTransferred,
-									  &completionKey, &pOverlapped, INFINITE);
+		BOOL result = GetQueuedCompletionStatus(hIocp_, &bytesTransferred,
+												&completionKey, &ov, INFINITE);
 
-		OverlappedEx* pOverlappedEx =
-			CONTAINING_RECORD(pOverlapped, OverlappedEx, overlapped_);
-
-		if (!pOverlappedEx) {
+		if (!ov) {
 			if (result) {
 				LOG_INFO("IOCP is shutting down.");
 				break;
@@ -82,11 +78,13 @@ void IocpCore::WorkerThread() {
 			}
 		}
 
+		OverlappedEx& ovEx = *CONTAINING_RECORD(ov, OverlappedEx, overlapped_);
+
 		LOG_DEBUG(
 			"GQCS - IOType: {} CompletionKey: {:#x} Overlapped: {} "
 			"BytesTransferred: {}",
-			static_cast<int>(pOverlappedEx->ioType_), completionKey,
-			static_cast<void*>(pOverlappedEx), bytesTransferred);
+			static_cast<int>(ovEx.ioType_), completionKey,
+			static_cast<void*>(&ovEx), bytesTransferred);
 
 		if (!result) {
 			int error = WSAGetLastError();
@@ -95,7 +93,7 @@ void IocpCore::WorkerThread() {
 				break;
 			}
 
-			if (pOverlappedEx->ioType_ == IO_TYPE::ACCEPT) {
+			if (ovEx.ioType_ == IO_TYPE::ACCEPT) {
 				LOG_ERROR("Accept operation failed: {}", error);
 			} else {
 				LOG_ERROR("I/O operation failed: {}", error);
@@ -108,9 +106,9 @@ void IocpCore::WorkerThread() {
 			continue;
 		}
 
-		if (pOverlappedEx->ioType_ == IO_TYPE::ACCEPT) {
+		if (ovEx.ioType_ == IO_TYPE::ACCEPT) {
 			Listener* listener = reinterpret_cast<Listener*>(completionKey);
-			if (!listener->HandleAccept(pOverlappedEx)) {
+			if (!listener->HandleAccept(ovEx)) {
 				LOG_ERROR("Failed to handle accept");
 			}
 		} else {
@@ -122,7 +120,7 @@ void IocpCore::WorkerThread() {
 				objPtr->Close();
 			}
 
-			if (!objPtr->HandleIO(pOverlappedEx, bytesTransferred)) {
+			if (!objPtr->HandleIO(ovEx, bytesTransferred)) {
 				LOG_ERROR("Failed to handle I/O operation");
 				objPtr->Close();
 			}

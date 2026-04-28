@@ -2,7 +2,6 @@
 
 #include <WinSock2.h>
 
-#include <atomic>
 #include <functional>
 #include <mutex>
 
@@ -18,11 +17,11 @@ class Session : public PoolElement<Session> {
 
 	bool RegisterRead();
 	bool RegisterWrite();
-	bool SendPacket(const char* packet);
+	bool SendPacket(const PACKET_HEADER& packet);
 
 	bool OnRead(const DWORD bytesTransferred);
 	bool OnWrite(const DWORD bytesTransferred);
-	bool HandleIO(OverlappedEx* ovEx, const DWORD bytesTransferred);
+	bool HandleIO(OverlappedEx& ovEx, const DWORD bytesTransferred);
 
 	void Close();
 

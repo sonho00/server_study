@@ -8,7 +8,7 @@
 #include "ServerUtils.hpp"
 #include "Session.hpp"
 
-Listener::Listener(IocpCore* iocpCore, const uint16_t port,
+Listener::Listener(IocpCore& iocpCore, const uint16_t port,
 				   LPFN_ACCEPTEX acceptEx)
 	: iocpCore_(iocpCore), port_(port), acceptEx_(acceptEx) {
 	socket_ = ServerUtils::CreateListenSocket(port_);
@@ -32,7 +32,7 @@ Listener::Listener(IocpCore* iocpCore, const uint16_t port,
 	acceptOv.wsaBuf_.buf = acceptOv.buffer_.GetBuffer();
 	acceptOv.wsaBuf_.len = static_cast<ULONG>(acceptOv.buffer_.GetSize()) - 1;
 
-	if (!iocpCore_->Register(socket_, reinterpret_cast<ULONG_PTR>(this))) {
+	if (!iocpCore_.Register(socket_, reinterpret_cast<ULONG_PTR>(this))) {
 		LOG_FATAL("Failed to register listener socket with IOCP");
 	}
 }
@@ -44,14 +44,11 @@ Listener::~Listener() {
 	}
 }
 
-bool Listener::HandleAccept(const OverlappedEx* overlappedEx) {
-	if (!PostAccept()) {
-		// NetUtils::PrintError("Failed to post accept");
-		// return false;
-	}
+bool Listener::HandleAccept(const OverlappedEx& ovEx) {
+	PostAccept();
 
-	Session* session = CONTAINING_RECORD(overlappedEx, Session, readOv);
-	if (setsockopt(session->socket_, SOL_SOCKET, SO_UPDATE_ACCEPT_CONTEXT,
+	Session& session = *CONTAINING_RECORD(&ovEx, Session, readOv);
+	if (setsockopt(session.socket_, SOL_SOCKET, SO_UPDATE_ACCEPT_CONTEXT,
 				   reinterpret_cast<const char*>(&socket_),
 				   sizeof(socket_)) == SOCKET_ERROR) {
 		LOG_ERROR("setsockopt(SO_UPDATE_ACCEPT_CONTEXT) failed: {}",
@@ -59,9 +56,9 @@ bool Listener::HandleAccept(const OverlappedEx* overlappedEx) {
 		return false;
 	}
 
-	if (!session->RegisterRead()) {
+	if (!session.RegisterRead()) {
 		LOG_ERROR("Failed to post initial read");
-		session->Close();
+		session.Close();
 		return false;
 	}
 
@@ -76,7 +73,7 @@ bool Listener::PostAccept() {
 		return false;
 	}
 
-	std::shared_ptr<Session> session = iocpCore_->sessionPool_.Acquire();
+	std::shared_ptr<Session> session = iocpCore_.sessionPool_.Acquire();
 	if (!session) return false;
 
 	session->readOv.ioType_ = IO_TYPE::ACCEPT;
@@ -85,7 +82,7 @@ bool Listener::PostAccept() {
 		static_cast<ULONG>(session->readOv.buffer_.GetSize());
 	session->socket_ = hAcceptSocket;
 
-	if (!iocpCore_->Register(hAcceptSocket,
+	if (!iocpCore_.Register(hAcceptSocket,
 							 reinterpret_cast<ULONG_PTR>(session.get()))) {
 		LOG_ERROR("Failed to register accept socket with IOCP");
 		session->Close();
