@@ -2,12 +2,16 @@
 
 #include <WinSock2.h>
 
+#include <cstddef>
 #include <functional>
+#include <memory>
 #include <mutex>
 
 #include "Network/Common/ObjectPool.hpp"
 #include "Network/Common/Protocol.hpp"
 #include "OverlappedEx.hpp"
+
+class SessionManager;
 
 class Session : public PoolElement<Session> {
    public:
@@ -25,11 +29,22 @@ class Session : public PoolElement<Session> {
 
 	void Close();
 
+	void SetSessionManager(const std::shared_ptr<SessionManager>& sessionManager) {
+		sessionManager_ = sessionManager;
+	}
+	std::shared_ptr<SessionManager> GetSessionManager() const {
+		return sessionManager_.lock();
+	}
+	size_t GetSessionId() const { return sessionId_; }
+	void SetSessionId(const size_t sessionId) { sessionId_ = sessionId; }
+
 	OverlappedEx readOv = {};
 	OverlappedEx writeOv = {};
 	SOCKET socket_ = INVALID_SOCKET;
 
    private:
+	std::weak_ptr<SessionManager> sessionManager_;
+	size_t sessionId_ = 0;
 	std::mutex mtx;
 	bool isSending_ = false;
 
