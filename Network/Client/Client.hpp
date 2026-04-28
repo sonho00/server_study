@@ -11,14 +11,15 @@ class Client {
 	Client(const char* ip, const uint16_t port);
 	~Client();
 
-	SOCKET GetSocket() const { return socket_; }
-
-	bool SendPacket(const PACKET_HEADER* header);
+	bool SendPacket(const PACKET_HEADER& header);
 	bool ReceiveByte(char* buffer, const size_t bufferSize);
+	PACKET_HEADER* ReceivePacket(char* buffer);
 
-	bool HandlePacket(const PACKET_HEADER* header);
+	bool HandlePacket(const PACKET_HEADER& header);
 
 	void ThreadFunc(int i);
+
+	SOCKET GetSocket() const { return socket_; }
 
    private:
 	char buffer_[1024];
