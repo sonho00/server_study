@@ -79,12 +79,17 @@ void IocpCore::WorkerThread() {
 		}
 
 		OverlappedEx& ovEx = *CONTAINING_RECORD(ov, OverlappedEx, overlapped_);
-
-		LOG_DEBUG(
-			"GQCS - IOType: {} CompletionKey: {:#x} Overlapped: {} "
-			"BytesTransferred: {}",
-			static_cast<int>(ovEx.ioType_), completionKey,
-			static_cast<void*>(&ovEx), bytesTransferred);
+		if (ovEx.ioType_ == IO_TYPE::ACCEPT) {
+			Session* session = CONTAINING_RECORD(&ovEx, Session, readOv);
+			LOG_DEBUG("[Session:{}] IOType: {} BytesTransferred: {}",
+					  session->GetHandle(), static_cast<int>(ovEx.ioType_),
+					  bytesTransferred);
+		} else {
+			Session* session = reinterpret_cast<Session*>(completionKey);
+			LOG_DEBUG("[Session:{}] IOType: {} BytesTransferred: {}",
+					  session->GetHandle(), static_cast<int>(ovEx.ioType_),
+					  bytesTransferred);
+		}
 
 		if (!result) {
 			int error = WSAGetLastError();

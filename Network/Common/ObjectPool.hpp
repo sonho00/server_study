@@ -11,6 +11,7 @@ class PoolElement : public std ::enable_shared_from_this<T> {
 		requires std::derived_from<U, PoolElement<U>>
 	friend class ObjectPool;
 
+   public:
 	uint64_t GetHandle() const {
 		return (static_cast<uint64_t>(generation_) << 32) | who_;
 	}
