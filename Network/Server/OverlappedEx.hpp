@@ -2,8 +2,12 @@
 
 #include <WinSock2.h>
 
+#include <memory>
+
 #include "Network/Common/MagicBuffer.hpp"
 #include "Network/Common/Protocol.hpp"
+
+class Session;
 
 struct OverlappedEx {
 	OverlappedEx(const size_t bufferSize = 1 << 16) : buffer_(bufferSize) {}
@@ -13,6 +17,7 @@ struct OverlappedEx {
 
 	WSABUF wsaBuf_ = {};
 	MagicBuffer buffer_;
+	std::shared_ptr<Session> owner_;
 
 	size_t readPos_ = 0;
 	size_t writePos_ = 0;

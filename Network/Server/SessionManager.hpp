@@ -11,7 +11,7 @@
 class SessionManager {
    public:
 	std::shared_ptr<Session> CreateSession();
-	void AddSession(std::shared_ptr<Session> session);
+	void AddSession(Session& session);
 	void RemoveSession(size_t sessionId);
 
    private:
