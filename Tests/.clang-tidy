@@ -1,0 +1,16 @@
+---
+# 부모의 복잡한 설정을 완전히 무시합니다.
+InheritParentConfig: false
+
+# 필요한 그룹만 켜고, 그 안에서 짜증 나는 것들만 뺍니다.
+Checks: >
+  bugprone-*,
+  performance-*,
+  -bugprone-implicit-widening-of-multiplication-result,
+  -bugprone-easily-swappable-parameters,
+  modernize-use-nullptr,
+  modernize-use-override
+
+# 스타일(naming, length, magic number)은 아예 Checks 리스트에 넣지도 않았습니다.
+# 따라서 관련 시비는 원천 차단됩니다.
+---

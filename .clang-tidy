@@ -1,0 +1,60 @@
+---
+Checks: >
+  -*,
+  bugprone-*,
+  modernize-*,
+  performance-*,
+  readability-*,
+  -readability-braces-around-statements,
+  -modernize-use-trailing-return-type,
+  cppcoreguidelines-interfaces,
+  cppcoreguidelines-pro-type-member-init,
+  google-default-arguments,
+  HeaderFilterRegex: '.*'
+
+CheckOptions:
+  # 1. 성능: 전위 연산자 (++i) 권장
+  - key: performance-increments-pre-dec.CheckIntegral
+    value: 'true'
+
+  # 2. 명명 규칙 (원본 유지 및 강화)
+  - key: readability-identifier-naming.ClassCase
+    value: PascalCase
+  - key: readability-identifier-naming.FunctionCase
+    value: PascalCase
+  - key: readability-identifier-naming.VariableCase
+    value: camelCase
+  - key: readability-identifier-naming.ParameterCase
+    value: camelCase
+  - key: readability-identifier-naming.MemberCase
+    value: camelCase
+  - key: readability-identifier-naming.MemberSuffix
+    value: '_'
+
+  # 3. 전역 상수: kPascalCase (구글 스타일)
+  - key: readability-identifier-naming.GlobalConstantCase
+    value: PascalCase
+  - key: readability-identifier-naming.GlobalConstantPrefix
+    value: 'k'
+
+  # 4. 상수(const): kPascalCase (지역 상수 포함)
+  - key: readability-identifier-naming.ConstantCase
+    value: PascalCase
+  - key: readability-identifier-naming.ConstantPrefix
+    value: 'k'
+
+  # 5. auto 사용 권고 강도 조절 (명시적 초기화 시에만 제안)
+  - key: modernize-use-auto.MinTypeNameLength
+    value: '5'
+
+  # 매개변수는 const 여부와 상관없이 camelCase 유지
+  - key: readability-identifier-naming.ParameterCase
+    value: camelCase
+
+  # 핵심: const가 붙은 매개변수에 대해 별도의 형식을 강제하지 않음
+  - key: readability-identifier-naming.ConstParameterCase
+    value: camelCase
+
+  - key: readability-identifier-length.IgnoredVariableNames
+    value: "_"
+---

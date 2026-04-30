@@ -12,3 +12,4 @@
 .vscode/
 bin/
 obj/
+build/
