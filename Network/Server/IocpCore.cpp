@@ -8,7 +8,7 @@
 #include <thread>
 
 #include "Listener.hpp"
-#include "Network/Common/NetUtils.hpp"
+#include "Network/Common/Logger.hpp"
 #include "Session.hpp"
 
 IocpCore::IocpCore() {

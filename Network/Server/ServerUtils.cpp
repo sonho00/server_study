@@ -2,7 +2,7 @@
 
 #include <WinSock2.h>
 
-#include "Network/Common/NetUtils.hpp"
+#include "Network/Common/Logger.hpp"
 
 namespace ServerUtils {
 NetFuncs::NetFuncs() : acceptEx_(nullptr) {

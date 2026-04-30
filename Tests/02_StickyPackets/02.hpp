@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Network/Common/NetUtils.hpp"
+#include "Network/Common/Logger.hpp"
 #include "Network/Common/Protocol.hpp"
 #include "Tests/Client.hpp"
 
@@ -22,11 +22,10 @@ class StickyPackets : public Client {
 		send(socket_, buf, 150012, 0);
 
 		memset(buf, 0, sizeof(buf));
-		std::cout << std::format(
-			"Reset buffer: {} {} {}\n",
-			reinterpret_cast<PACKET_HEADER*>(buf)->id,
-			reinterpret_cast<PACKET_HEADER*>(buf)->size,
-			reinterpret_cast<char*>(buf + sizeof(PACKET_HEADER)));
+		LOG_INFO("Reset buffer: {} {} {}",
+				 reinterpret_cast<PACKET_HEADER*>(buf)->id,
+				 reinterpret_cast<PACKET_HEADER*>(buf)->size,
+				 reinterpret_cast<char*>(buf + sizeof(PACKET_HEADER)));
 
 		for (int i = 0; i < 3; ++i) {
 			recv(socket_, buf + i * 50004, 50004, 0);

@@ -1,6 +1,6 @@
 #include "PacketHandler.hpp"
 
-#include "Network/Common/NetUtils.hpp"
+#include "Network/Common/Logger.hpp"
 #include "Network/Common/Protocol.hpp"
 #include "Session.hpp"
 
