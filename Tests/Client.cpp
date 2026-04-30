@@ -2,12 +2,10 @@
 
 #include <ws2tcpip.h>
 
-#include <cstddef>
-
 #include "Network/Common/NetUtils.hpp"
 #include "Network/Common/Protocol.hpp"
 
-Client::Client(const char* ip, const uint16_t port)
+Client::Client(const char* ipAddr, uint16_t port)
 	: socket_(socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) {
 	if (socket_ == INVALID_SOCKET) {
 		LOG_FATAL("Failed to create socket: {}", WSAGetLastError());
@@ -25,9 +23,9 @@ Client::Client(const char* ip, const uint16_t port)
 		LOG_ERROR("setsockopt TCP_NODELAY failed: {}", WSAGetLastError());
 	}
 
-	sockaddr_in serverAddr;
+	sockaddr_in serverAddr{};
 	serverAddr.sin_family = AF_INET;
-	InetPton(AF_INET, ip, &serverAddr.sin_addr);
+	InetPton(AF_INET, ipAddr, &serverAddr.sin_addr);
 	serverAddr.sin_port = htons(port);
 	if (connect(socket_, (sockaddr*)&serverAddr, sizeof(serverAddr)) ==
 		SOCKET_ERROR) {
@@ -42,12 +40,12 @@ Client::~Client() {
 	}
 }
 
-bool Client::SendPacket(const PACKET_HEADER* header) {
-	const char* buffer = reinterpret_cast<const char*>(header);
+bool Client::SendPacket(const PACKET_HEADER& header) const {
+	const char* buffer = reinterpret_cast<const char*>(&header);
 	int bytesSent = 0;
-	while (bytesSent < header->size) {
+	while (bytesSent < header.size) {
 		int result =
-			send(socket_, buffer + bytesSent, header->size - bytesSent, 0);
+			send(socket_, buffer + bytesSent, header.size - bytesSent, 0);
 		if (result == 0) {
 			LOG_INFO("Connection closed by server.");
 			return false;
@@ -61,11 +59,11 @@ bool Client::SendPacket(const PACKET_HEADER* header) {
 	return true;
 }
 
-bool Client::ReceiveByte(char* buffer, const size_t len) {
-	size_t bytesReceived = 0;
+bool Client::ReceiveByte(char* buffer, uint32_t len) const {
+	uint32_t bytesReceived = 0;
 	while (bytesReceived < len) {
-		int result =
-			recv(socket_, buffer + bytesReceived, len - bytesReceived, 0);
+		int result = recv(socket_, buffer + bytesReceived,
+						  static_cast<int>(len - bytesReceived), 0);
 		if (result == 0) {
 			LOG_INFO("Connection closed by server.");
 			return false;
@@ -79,12 +77,37 @@ bool Client::ReceiveByte(char* buffer, const size_t len) {
 	return true;
 }
 
-bool Client::HandlePacket(const PACKET_HEADER* header) {
-	if (header->id == static_cast<uint16_t>(C2S_PACKET_ID::kMove)) {
-	} else if (header->id == static_cast<uint16_t>(C2S_PACKET_ID::kChat)) {
-	} else {
-		LOG_WARN("Unknown packet ID received.");
-		return false;
+PACKET_HEADER* Client::ReceivePacket(char* buffer) {
+	if (!ReceiveByte(buffer, sizeof(PACKET_HEADER))) {
+		LOG_WARN("Failed to receive packet header from server.");
+		return nullptr;
+	}
+
+	auto* header = reinterpret_cast<PACKET_HEADER*>(buffer);
+	if (header->size < sizeof(PACKET_HEADER) ||
+		static_cast<size_t>(header->size) > buffer_.size()) {
+		LOG_WARN("Invalid packet size received: {}", header->size);
+		return nullptr;
+	}
+
+	if (!ReceiveByte(buffer + sizeof(PACKET_HEADER),
+					 header->size - sizeof(PACKET_HEADER))) {
+		LOG_WARN("Failed to receive full packet from server.");
+		return nullptr;
+	}
+
+	return header;
+}
+
+bool Client::HandlePacket(const PACKET_HEADER& header) {
+	switch (header.id) {
+		case static_cast<uint16_t>(C2S_PACKET_ID::kMove):
+		case static_cast<uint16_t>(C2S_PACKET_ID::kChat):
+			break;
+
+		default:
+			LOG_WARN("Unknown packet ID received.");
+			return false;
 	}
 
 	return true;
