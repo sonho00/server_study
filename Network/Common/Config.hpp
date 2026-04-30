@@ -5,7 +5,7 @@
 #include <cstdint>
 
 namespace Config {
-constexpr uint16_t kPort = 8080;
+constexpr uint16_t kPort = 12345;
 constexpr uint32_t kClientCount = 16;
 
 constexpr uint32_t kPoolSize = 4096;

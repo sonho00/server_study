@@ -3,6 +3,7 @@
 #include <thread>
 
 #include "01.hpp"
+#include "Network/Common/Config.hpp"
 #include "Network/Common/WSAManager.hpp"
 
 int main() {
@@ -11,9 +12,9 @@ int main() {
 	LOG_INFO("Test client started.");
 
 	const char* serverIp = "127.0.0.1";
-	uint16_t serverPort = 8080;
-	Fragmentation fragmentation(serverIp, serverPort);
-	std::thread clientThread(&Fragmentation::ThreadFunc, &fragmentation);
+	uint16_t serverPort = Config::kPort;
+	StickyPackets fragmentation(serverIp, serverPort);
+	std::thread clientThread(&StickyPackets::ThreadFunc, &fragmentation);
 
 	// 유저의 종료 신호를 기다립니다. 예: Enter 키
 	LOG_INFO("Press Enter to stop the client...");
