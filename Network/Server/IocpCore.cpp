@@ -75,6 +75,11 @@ bool IocpCore::HandleError(const IocpResult& iocpResult) {
 		return true;
 	}
 
+	if (error == ERROR_NETNAME_DELETED) {
+		LOG_INFO("Client disconnected.");
+		return false;
+	}
+
 	if (iocpResult.overlappedEx_->ioType_ == IO_TYPE::kAccept) {
 		LOG_ERROR("Accept operation failed: {}", error);
 	} else {

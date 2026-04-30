@@ -2,25 +2,26 @@
 
 #include <WinSock2.h>
 
+#include <array>
+
 #include "Network/Common/Protocol.hpp"
 
-SOCKET CreateClientSocket(const char* ip, uint16_t port);
+SOCKET CreateClientSocket(const char* ipAddr, uint16_t port);
 
 class Client {
    public:
-	Client(const char* ip, const uint16_t port);
+	Client(const char* ipAddr, uint16_t port);
 	~Client();
 
-	SOCKET GetSocket() const { return socket_; }
+	[[nodiscard]] bool SendPacket(const PACKET_HEADER& header) const;
+	[[nodiscard]] bool ReceiveByte(char* buffer, uint32_t len) const;
+	PACKET_HEADER* ReceivePacket(char* buffer);
 
-	bool SendPacket(const PACKET_HEADER* header);
-	bool ReceiveByte(char* buffer, const size_t bufferSize);
-
-	bool HandlePacket(const PACKET_HEADER* header);
+	static bool HandlePacket(const PACKET_HEADER& header);
 
 	virtual void ThreadFunc() = 0;
 
    protected:
-	char buffer_[1024];
-	const SOCKET socket_;
+	std::array<char, Config::kClientBufferSize> buffer_{};
+	SOCKET socket_;
 };
