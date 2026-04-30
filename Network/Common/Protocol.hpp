@@ -12,7 +12,7 @@ enum class S2C_PACKET_ID : uint8_t { kNone, kMove, kChat, kCnt };
 #pragma pack(push, 1)
 
 struct PACKET_HEADER {
-	uint16_t size;
+	int size;
 	uint16_t id;
 };
 

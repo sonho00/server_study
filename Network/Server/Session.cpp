@@ -12,7 +12,8 @@
 bool Session::RegisterRead() {
 	readOv_.ioType_ = IO_TYPE::kRecv;
 	readOv_.wsaBuf_.buf = readOv_.buffer_.GetBuffer() + readOv_.writePos_;
-	readOv_.wsaBuf_.len = readOv_.buffer_.GetSize() - readOv_.writePos_;
+	readOv_.wsaBuf_.len =
+		readOv_.buffer_.GetSize() - readOv_.writePos_ + readOv_.readPos_;
 	ZeroMemory(&readOv_.overlapped_, sizeof(OVERLAPPED));
 	DWORD flags = 0;
 	int recvResult = WSARecv(socket_, &readOv_.wsaBuf_, 1, nullptr, &flags,
@@ -136,14 +137,14 @@ bool Session::OnWrite(DWORD bytesTransferred) {
 	// 이 함수가 호출될 때는 is sending_가 true인 상태입니다.
 
 	std::lock_guard<std::mutex> lock(mtx_);
+	writeOv_.readPos_ += bytesTransferred;
+
 	if (writeOv_.writePos_ - writeOv_.readPos_ + bytesTransferred >
 		writeOv_.buffer_.GetSize()) {
 		LOG_ERROR("Write buffer overflow detected");
 		Close();
 		return false;
 	}
-
-	writeOv_.readPos_ += bytesTransferred;
 
 	if (writeOv_.readPos_ >= writeOv_.buffer_.GetSize()) {
 		writeOv_.readPos_ -= writeOv_.buffer_.GetSize();

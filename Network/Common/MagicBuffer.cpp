@@ -51,7 +51,6 @@ MagicBuffer::~MagicBuffer() {
 	if (buffer_ != nullptr) {
 		UnmapViewOfFile(buffer_);
 		UnmapViewOfFile(buffer_ + size_);
-		VirtualFree(buffer_, 0, MEM_RELEASE);
 	}
 	if (hMap_ != nullptr) CloseHandle(hMap_);
 }
