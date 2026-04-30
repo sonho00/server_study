@@ -61,3 +61,11 @@ add_custom_target(run-client
     WORKING_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
     COMMENT "Building and Running Client..."
 )
+
+# 테스트 실행 타겟
+add_custom_target(run-${TEST_TARGET_NAME}
+    COMMAND ${TEST_TARGET_NAME}
+    DEPENDS ${TEST_TARGET_NAME}
+    WORKING_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
+    COMMENT "Running ${TEST_TARGET_NAME}..."
+)
