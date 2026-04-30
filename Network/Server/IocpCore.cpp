@@ -97,10 +97,8 @@ void IocpCore::LogIOEvent(const IocpResult& iocpResult) {
 	if (iocpResult.overlappedEx_->ioType_ == IO_TYPE::kAccept) {
 		Session* session =
 			CONTAINING_RECORD(iocpResult.overlappedEx_, Session, readOv_);
-		LOG_DEBUG("[Session:{}] IOType: {} BytesTransferred: {}",
-				  session->GetHandle(),
-				  static_cast<int>(iocpResult.overlappedEx_->ioType_),
-				  iocpResult.bytesTransferred_);
+		LOG_INFO("[Listener] Accepted new connection - Session Handle: {}",
+				 session->GetHandle());
 	} else {
 		auto* session = reinterpret_cast<Session*>(iocpResult.completionKey_);
 		LOG_DEBUG("[Session:{}] IOType: {} BytesTransferred: {}",
@@ -123,14 +121,16 @@ void IocpCore::Dispatch(const IocpResult& iocpResult) {
 				->shared_from_this();
 
 		if (iocpResult.bytesTransferred_ == 0) {
-			LOG_INFO("Connection closed by client");
+			LOG_INFO("[Session:{}] Connection closed by client",
+					 objPtr->GetHandle());
 			objPtr->Close();
 			return;
 		}
 
 		if (!objPtr->HandleIO(*iocpResult.overlappedEx_,
 							  iocpResult.bytesTransferred_)) {
-			LOG_ERROR("Failed to handle I/O operation");
+			LOG_ERROR("[Session:{}] Failed to handle I/O operation",
+					  objPtr->GetHandle());
 			objPtr->Close();
 		}
 	}

@@ -28,7 +28,8 @@ bool Session::RegisterRead() {
 	if (recvResult == SOCKET_ERROR) {
 		int errorCode = WSAGetLastError();
 		if (errorCode != ERROR_IO_PENDING) {
-			LOG_ERROR("WSARecv failed: {}", errorCode);
+			LOG_ERROR("[Session:{}] WSARecv failed: {}", GetHandle(),
+					  errorCode);
 			Close();
 			return false;
 		}
@@ -57,7 +58,8 @@ bool Session::RegisterWrite() {
 	if (sendResult == SOCKET_ERROR) {
 		int errorCode = WSAGetLastError();
 		if (errorCode != ERROR_IO_PENDING) {
-			LOG_ERROR("WSASend failed: {}", errorCode);
+			LOG_ERROR("[Session:{}] WSASend failed: {}", GetHandle(),
+					  errorCode);
 			Close();
 			return false;
 		}
@@ -77,7 +79,7 @@ bool Session::SendPacket(const PACKET_HEADER& header) {
 		isSending_ = true;
 
 		if (!RegisterWrite()) {
-			LOG_ERROR("Failed to post another write");
+			LOG_ERROR("[Session:{}] Failed to post another write", GetHandle());
 			return false;
 		}
 	}
@@ -88,7 +90,7 @@ bool Session::SendPacket(const PACKET_HEADER& header) {
 bool Session::OnRead(DWORD bytesTransferred) {
 	if (readOv_.writePos_ - readOv_.readPos_ + bytesTransferred >
 		readOv_.buffer_.GetSize()) {
-		LOG_ERROR("Read buffer overflow detected");
+		LOG_ERROR("[Session:{}] Read buffer overflow detected", GetHandle());
 		Close();
 		return false;
 	}
@@ -103,7 +105,8 @@ bool Session::OnRead(DWORD bytesTransferred) {
 			readOv_.buffer_.GetBuffer() + readOv_.readPos_);
 
 		if (header->size == 0 || header->size > readOv_.buffer_.GetSize()) {
-			LOG_ERROR("Invalid packet size: {}", header->size);
+			LOG_ERROR("[Session:{}] Invalid packet size: {}", GetHandle(),
+					  header->size);
 			Close();
 			return false;
 		}
@@ -111,11 +114,14 @@ bool Session::OnRead(DWORD bytesTransferred) {
 		if (availableData < header->size) break;
 
 		if (!PacketHandler::Execute(*this, *header)) {
-			LOG_ERROR("Failed to handle packet with ID: {}",
-					  static_cast<uint16_t>(header->id));
+			LOG_ERROR("[Session:{}] Failed to handle packet with ID: {}",
+					  GetHandle(), static_cast<uint16_t>(header->id));
 			Close();
 			return false;
 		}
+
+		LOG_DEBUG("[Session:{}] Processed packet ID: {}, Size: {}", GetHandle(),
+				  static_cast<uint16_t>(header->id), header->size);
 
 		readOv_.readPos_ += header->size;
 	}
@@ -126,7 +132,7 @@ bool Session::OnRead(DWORD bytesTransferred) {
 	}
 
 	if (!RegisterRead()) {
-		LOG_ERROR("Failed to post another read");
+		LOG_ERROR("[Session:{}] Failed to post another read", GetHandle());
 		return false;
 	}
 
@@ -141,7 +147,7 @@ bool Session::OnWrite(DWORD bytesTransferred) {
 
 	if (writeOv_.writePos_ - writeOv_.readPos_ + bytesTransferred >
 		writeOv_.buffer_.GetSize()) {
-		LOG_ERROR("Write buffer overflow detected");
+		LOG_ERROR("[Session:{}] Write buffer overflow detected", GetHandle());
 		Close();
 		return false;
 	}
@@ -157,7 +163,7 @@ bool Session::OnWrite(DWORD bytesTransferred) {
 	}
 
 	if (!RegisterWrite()) {
-		LOG_ERROR("Failed to post another write");
+		LOG_ERROR("[Session:{}] Failed to post another write", GetHandle());
 		return false;
 	}
 
@@ -171,7 +177,7 @@ bool Session::HandleIO(OverlappedEx& ovEx, DWORD bytesTransferred) {
 		case IO_TYPE::kSend:
 			return OnWrite(bytesTransferred);
 		default:
-			LOG_ERROR("Unknown IO type");
+			LOG_ERROR("[Session:{}] Unknown IO type", GetHandle());
 			return false;
 	}
 }
