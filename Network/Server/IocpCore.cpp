@@ -120,6 +120,7 @@ void IocpCore::Dispatch(const IocpResult& iocpResult) {
 		if (iocpResult.bytesTransferred_ == 0) {
 			LOG_INFO("Connection closed by client");
 			objPtr->Close();
+			return;
 		}
 
 		if (!objPtr->HandleIO(*iocpResult.overlappedEx_,
