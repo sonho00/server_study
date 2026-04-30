@@ -5,9 +5,9 @@
 #include "Network/Common/NetUtils.hpp"
 
 namespace ServerUtils {
-NetFuncs::NetFuncs() {
-	SOCKET dummySocket = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, NULL, 0,
-								   WSA_FLAG_OVERLAPPED);
+NetFuncs::NetFuncs() : acceptEx_(nullptr) {
+	SOCKET dummySocket = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, nullptr,
+								   0, WSA_FLAG_OVERLAPPED);
 
 	if (dummySocket == INVALID_SOCKET) {
 		LOG_FATAL("Failed to create dummy socket: {}", WSAGetLastError());
@@ -16,9 +16,10 @@ NetFuncs::NetFuncs() {
 	GUID guidAcceptEx = WSAID_ACCEPTEX;
 	DWORD bytesReturned = 0;
 
-	int result = WSAIoctl(dummySocket, SIO_GET_EXTENSION_FUNCTION_POINTER,
-						  &guidAcceptEx, sizeof(guidAcceptEx), &AcceptEx,
-						  sizeof(AcceptEx), &bytesReturned, NULL, NULL);
+	int result =
+		WSAIoctl(dummySocket, SIO_GET_EXTENSION_FUNCTION_POINTER, &guidAcceptEx,
+				 sizeof(guidAcceptEx), static_cast<void*>(&acceptEx_),
+				 sizeof(acceptEx_), &bytesReturned, nullptr, nullptr);
 
 	closesocket(dummySocket);
 
@@ -28,14 +29,14 @@ NetFuncs::NetFuncs() {
 	}
 }
 
-SOCKET CreateListenSocket(const USHORT port) {
-	SOCKET listenSocket = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, NULL, 0,
-									WSA_FLAG_OVERLAPPED);
+SOCKET CreateListenSocket(USHORT port) {
+	SOCKET listenSocket = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, nullptr,
+									0, WSA_FLAG_OVERLAPPED);
 	if (listenSocket == INVALID_SOCKET) {
 		LOG_FATAL("WSASocket failed: {}", WSAGetLastError());
 	}
 
-	sockaddr_in serverAddr;
+	sockaddr_in serverAddr{};
 	serverAddr.sin_family = AF_INET;
 	serverAddr.sin_addr.s_addr = INADDR_ANY;
 	serverAddr.sin_port = htons(port);

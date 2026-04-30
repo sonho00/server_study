@@ -2,8 +2,6 @@
 
 #include "ServerService.hpp"
 
-#pragma comment(lib, "ws2_32.lib")
-
 int main() {
 	ServerService serverService;
 	serverService.Start();

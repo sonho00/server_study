@@ -11,33 +11,33 @@
 #include <string_view>
 
 #define LOG_DEBUG(fmt, ...) \
-	NetUtils::LogInfo(NetUtils::LogLevel::Debug, fmt, ##__VA_ARGS__)
+	NetUtils::LogInfo(NetUtils::LogLevel::kDebug, fmt, ##__VA_ARGS__)
 #define LOG_INFO(fmt, ...) \
-	NetUtils::LogInfo(NetUtils::LogLevel::Info, fmt, ##__VA_ARGS__)
+	NetUtils::LogInfo(NetUtils::LogLevel::kInfo, fmt, ##__VA_ARGS__)
 #define LOG_WARN(fmt, ...) \
-	NetUtils::LogInfo(NetUtils::LogLevel::Warn, fmt, ##__VA_ARGS__)
+	NetUtils::LogInfo(NetUtils::LogLevel::kWarn, fmt, ##__VA_ARGS__)
 #define LOG_ERROR(fmt, ...)                            \
-	NetUtils::LogError(NetUtils::LogLevel::Error, fmt, \
+	NetUtils::LogError(NetUtils::LogLevel::kError, fmt, \
 					   std::source_location::current(), ##__VA_ARGS__)
 #define LOG_FATAL(fmt, ...)                            \
-	NetUtils::LogError(NetUtils::LogLevel::Fatal, fmt, \
+	NetUtils::LogError(NetUtils::LogLevel::kFatal, fmt, \
 					   std::source_location::current(), ##__VA_ARGS__)
 
 namespace NetUtils {
-enum class LogLevel { Debug, Info, Warn, Error, Fatal };
-inline LogLevel gLogLevel = LogLevel::Debug;
+enum class LogLevel : std::uint8_t { kDebug, kInfo, kWarn, kError, kFatal };
+inline LogLevel gLogLevel = LogLevel::kDebug;
 
 inline std::string_view GetLevelStr(LogLevel level) {
 	switch (level) {
-		case LogLevel::Debug:
+		case LogLevel::kDebug:
 			return "\033[36mDEBUG\033[0m";	// Cyan
-		case LogLevel::Info:
+		case LogLevel::kInfo:
 			return "\033[32mINFO \033[0m";	// Green
-		case LogLevel::Warn:
+		case LogLevel::kWarn:
 			return "\033[33mWARN \033[0m";	// Yellow
-		case LogLevel::Error:
+		case LogLevel::kError:
 			return "\033[31mERROR\033[0m";	// Red
-		case LogLevel::Fatal:
+		case LogLevel::kFatal:
 			return "\033[1;31mFATAL\033[0m";  // Bold Red
 		default:
 			return "NONE";
@@ -70,7 +70,7 @@ inline void LogError(LogLevel level, std::string_view fmt_str,
 		std::cerr << std::format("[{:%F %T}][{}][{}:{}]{}\n", now,
 								 GetLevelStr(level), location.file_name(),
 								 location.line(), msg);
-		if (level == LogLevel::Fatal) {
+		if (level == LogLevel::kFatal) {
 			std::cout.flush();
 			std::cerr.flush();
 			throw std::runtime_error(msg);

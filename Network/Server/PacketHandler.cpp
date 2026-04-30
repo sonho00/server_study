@@ -5,8 +5,7 @@
 #include "Session.hpp"
 
 namespace PacketHandler {
-std::function<bool(Session&, const PACKET_HEADER&)>
-	handlers[static_cast<size_t>(C2S_PACKET_ID::CNT)];
+std::array<HandlerFunc, static_cast<size_t>(C2S_PACKET_ID::kCnt)> handlers;
 
 bool HandleC2S_MOVE(Session& session, const PACKET_HEADER& header) {
 	if (!session.SendPacket(header)) {
@@ -16,7 +15,7 @@ bool HandleC2S_MOVE(Session& session, const PACKET_HEADER& header) {
 	}
 	return true;
 }
-REGISTER_PACKET_HANDLER(MOVE, HandleC2S_MOVE);
+REGISTER_PACKET_HANDLER(kMove, HandleC2S_MOVE);
 
 bool HandleC2S_CHAT(Session& session, const PACKET_HEADER& header) {
 	if (!session.SendPacket(header)) {
@@ -27,9 +26,9 @@ bool HandleC2S_CHAT(Session& session, const PACKET_HEADER& header) {
 
 	return true;
 }
-REGISTER_PACKET_HANDLER(CHAT, HandleC2S_CHAT);
+REGISTER_PACKET_HANDLER(kChat, HandleC2S_CHAT);
 
-bool Execute(Session& session, const PACKET_HEADER& packet) {
-	return handlers[static_cast<size_t>(packet.id)](session, packet);
+bool Execute(Session& session, const PACKET_HEADER& header) {
+	return handlers[static_cast<size_t>(header.id)](session, header);
 }
 }  // namespace PacketHandler

@@ -5,8 +5,6 @@
 #include "01_Mice.hpp"
 #include "Network/Common/WSAManager.hpp"
 
-#pragma comment(lib, "ws2_32.lib")
-
 int main() {
 	WSAManager wsaManager;
 
@@ -20,7 +18,6 @@ int main() {
 	// 유저의 종료 신호를 기다립니다. 예: Enter 키
 	LOG_INFO("Press Enter to stop the client...");
 	std::cin.get();
-
 	LOG_INFO("Test client stopped.");
 
 	return 0;

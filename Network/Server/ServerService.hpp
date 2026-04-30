@@ -12,15 +12,16 @@
 class ServerService {
    public:
 	ServerService()
-		: listener_(iocpCore_, sessionManager_, 8080, netFuncs_.AcceptEx) {}
+		: listener_(iocpCore_, sessionManager_, Config::kPort,
+					netFuncs_.acceptEx_) {}
 
 	bool Start() {
-		int numThreads = std::thread::hardware_concurrency();
+		size_t numThreads = std::thread::hardware_concurrency();
 		if (!iocpCore_.Start(numThreads)) {
 			LOG_FATAL("Failed to start IOCP worker threads");
 		}
 
-		for (int i = 0; i < 16; ++i) {
+		for (size_t i = 0; i < Config::kInitialAcceptCount; ++i) {
 			if (!listener_.PostAccept()) {
 				LOG_ERROR("Failed to post initial accept");
 				return false;

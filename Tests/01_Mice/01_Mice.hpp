@@ -1,7 +1,5 @@
 #pragma once
 
-#include <stdio.h>
-
 #include "Network/Common/NetUtils.hpp"
 #include "Network/Common/Protocol.hpp"
 #include "Tests/Client.hpp"
@@ -11,8 +9,8 @@ class Mice : public Client {
 	Mice(const char* ip, const uint16_t port) : Client(ip, port) {}
 	void ThreadFunc() override {
 		char buf[605]{};
-		C2S_CHAT* packet = reinterpret_cast<C2S_CHAT*>(buf);
-		packet->header.id = static_cast<uint16_t>(C2S_PACKET_ID::CHAT);
+		auto* packet = reinterpret_cast<C2S_CHAT*>(buf);
+		packet->header.id = static_cast<uint16_t>(C2S_PACKET_ID::kChat);
 		packet->header.size = 604;
 		char temp[4]{};
 		for (int i = 0; i < 200; ++i) {
@@ -27,10 +25,10 @@ class Mice : public Client {
 			}
 		}
 		memset(buf, 0, 605);
-		std::cout << "Reset buffer: " << packet->header.id << " "
-				  << packet->header.size << " " << packet->message << std::endl;
+		std::cout << std::format("Reset buffer: {} {} {}\n", packet->header.id,
+								 packet->header.size, packet->message);
 		recv(socket_, buf, 605, 0);
-		std::cout << packet->header.id << " " << packet->header.size << " "
-				  << packet->message << std::endl;
+		std::cout << std::format("{} {} {}\n", packet->header.id,
+								 packet->header.size, packet->message);
 	}
 };

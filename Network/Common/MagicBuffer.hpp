@@ -5,11 +5,11 @@
 class MagicBuffer {
    public:
 	MagicBuffer() = default;
-	MagicBuffer(const size_t size);
+	MagicBuffer(size_t size);
 	~MagicBuffer();
 
-	char* GetBuffer() const { return buffer_; }
-	size_t GetSize() const { return size_; }
+	[[nodiscard]] char* GetBuffer() const { return buffer_; }
+	[[nodiscard]] size_t GetSize() const { return size_; }
 
    private:
 	HANDLE hMap_;

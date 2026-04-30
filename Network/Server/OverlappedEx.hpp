@@ -10,10 +10,11 @@
 class Session;
 
 struct OverlappedEx {
-	OverlappedEx(const size_t bufferSize = 1 << 16) : buffer_(bufferSize) {}
+	OverlappedEx(size_t bufferSize = Config::kMagicBufferSize)
+		: buffer_(bufferSize) {}
 
 	OVERLAPPED overlapped_ = {};
-	IO_TYPE ioType_ = IO_TYPE::NONE;
+	IO_TYPE ioType_ = IO_TYPE::kNone;
 
 	WSABUF wsaBuf_ = {};
 	MagicBuffer buffer_;

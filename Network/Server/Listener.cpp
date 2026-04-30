@@ -9,7 +9,7 @@
 #include "SessionManager.hpp"
 
 Listener::Listener(IocpCore& iocpCore, SessionManager& sessionManager,
-				   const uint16_t port, LPFN_ACCEPTEX acceptEx)
+				   uint16_t port, LPFN_ACCEPTEX acceptEx)
 	: iocpCore_(iocpCore),
 	  sessionManager_(sessionManager),
 	  port_(port),
@@ -31,9 +31,9 @@ Listener::Listener(IocpCore& iocpCore, SessionManager& sessionManager,
 		LOG_ERROR("setsockopt(TCP_NODELAY) failed: {}", WSAGetLastError());
 	}
 
-	acceptOv.ioType_ = IO_TYPE::ACCEPT;
-	acceptOv.wsaBuf_.buf = acceptOv.buffer_.GetBuffer();
-	acceptOv.wsaBuf_.len = static_cast<ULONG>(acceptOv.buffer_.GetSize()) - 1;
+	acceptOv_.ioType_ = IO_TYPE::kAccept;
+	acceptOv_.wsaBuf_.buf = acceptOv_.buffer_.GetBuffer();
+	acceptOv_.wsaBuf_.len = static_cast<ULONG>(acceptOv_.buffer_.GetSize()) - 1;
 
 	if (!iocpCore_.Register(socket_, reinterpret_cast<ULONG_PTR>(this))) {
 		LOG_FATAL("Failed to register listener socket with IOCP");
@@ -50,7 +50,7 @@ Listener::~Listener() {
 bool Listener::HandleAccept(const OverlappedEx& ovEx) {
 	PostAccept();
 
-	Session& session = *CONTAINING_RECORD(&ovEx, Session, readOv);
+	Session& session = *CONTAINING_RECORD(&ovEx, Session, readOv_);
 	if (setsockopt(session.socket_, SOL_SOCKET, SO_UPDATE_ACCEPT_CONTEXT,
 				   reinterpret_cast<const char*>(&socket_),
 				   sizeof(socket_)) == SOCKET_ERROR) {
@@ -60,7 +60,7 @@ bool Listener::HandleAccept(const OverlappedEx& ovEx) {
 	}
 
 	sessionManager_.AddSession(session);
-	session.readOv.owner_ = nullptr;
+	session.readOv_.owner_ = nullptr;
 
 	if (!session.RegisterRead()) {
 		LOG_ERROR("Failed to post initial read");
@@ -82,12 +82,12 @@ bool Listener::PostAccept() {
 	std::shared_ptr<Session> session = sessionManager_.CreateSession();
 	if (!session) return false;
 
-	session->readOv.owner_ = session;
+	session->readOv_.owner_ = session;
 
-	session->readOv.ioType_ = IO_TYPE::ACCEPT;
-	session->readOv.wsaBuf_.buf = session->readOv.buffer_.GetBuffer();
-	session->readOv.wsaBuf_.len =
-		static_cast<ULONG>(session->readOv.buffer_.GetSize());
+	session->readOv_.ioType_ = IO_TYPE::kAccept;
+	session->readOv_.wsaBuf_.buf = session->readOv_.buffer_.GetBuffer();
+	session->readOv_.wsaBuf_.len =
+		static_cast<ULONG>(session->readOv_.buffer_.GetSize());
 	session->socket_ = hAcceptSocket;
 
 	if (!iocpCore_.Register(hAcceptSocket,
@@ -98,12 +98,12 @@ bool Listener::PostAccept() {
 	}
 
 	DWORD bytesReceived = 0;
-	DWORD addrLen = sizeof(sockaddr_in) + 16;
-	BOOL result = acceptEx_(
-		socket_, hAcceptSocket, session->readOv.buffer_.GetBuffer(), 0, addrLen,
-		addrLen, &bytesReceived, &session->readOv.overlapped_);
+	BOOL result =
+		acceptEx_(socket_, hAcceptSocket, session->readOv_.buffer_.GetBuffer(),
+				  0, Config::kAcceptAddrSize, Config::kAcceptAddrSize,
+				  &bytesReceived, &session->readOv_.overlapped_);
 
-	if (!result) {
+	if (result == FALSE) {
 		int errorCode = WSAGetLastError();
 		if (errorCode != ERROR_IO_PENDING) {
 			LOG_ERROR("AcceptEx failed: {}", errorCode);

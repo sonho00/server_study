@@ -8,7 +8,6 @@
 
 #include "Listener.hpp"
 #include "Network/Common/NetUtils.hpp"
-#include "OverlappedEx.hpp"
 #include "Session.hpp"
 
 IocpCore::IocpCore() {
@@ -19,11 +18,11 @@ IocpCore::IocpCore() {
 }
 
 IocpCore::~IocpCore() {
-	for (std::thread& thread : threads_) {
+	for (auto& _ : threads_) {
 		PostQueuedCompletionStatus(hIocp_, 0, 0, nullptr);
 	}
 
-	for (std::thread& thread : threads_) {
+	for (auto& thread : threads_) {
 		if (thread.joinable()) {
 			thread.join();
 		}
@@ -32,7 +31,7 @@ IocpCore::~IocpCore() {
 	CloseHandle(hIocp_);
 }
 
-bool IocpCore::Start(const size_t threadCount) {
+bool IocpCore::Start(size_t threadCount) {
 	threads_.resize(threadCount);
 	for (size_t i = 0; i < threadCount; ++i) {
 		threads_[i] = std::thread(&IocpCore::WorkerThread, this);
@@ -48,8 +47,7 @@ bool IocpCore::Start(const size_t threadCount) {
 	return true;
 }
 
-bool IocpCore::Register(const SOCKET socket,
-						const ULONG_PTR completionKey) const {
+bool IocpCore::Register(SOCKET socket, ULONG_PTR completionKey) const {
 	if (CreateIoCompletionPort(reinterpret_cast<HANDLE>(socket), hIocp_,
 							   completionKey, 0) == nullptr) {
 		LOG_ERROR("Failed to register socket with IOCP: {}", GetLastError());
@@ -60,45 +58,45 @@ bool IocpCore::Register(const SOCKET socket,
 
 void IocpCore::WorkerThread() {
 	while (true) {
-		OVERLAPPED* ov = nullptr;
+		OVERLAPPED* overlapped = nullptr;
 		DWORD bytesTransferred = 0;
 		ULONG_PTR completionKey = 0;
 
-		BOOL result = GetQueuedCompletionStatus(hIocp_, &bytesTransferred,
-												&completionKey, &ov, INFINITE);
+		BOOL result = GetQueuedCompletionStatus(
+			hIocp_, &bytesTransferred, &completionKey, &overlapped, INFINITE);
 
-		if (!ov) {
-			if (result) {
+		if (overlapped == nullptr) {
+			if (result != FALSE) {
 				LOG_INFO("IOCP is shutting down.");
 				break;
-			} else {
-				LOG_ERROR("GetQueuedCompletionStatus failed: {}",
-						  GetLastError());
-				continue;
 			}
+			LOG_ERROR("GetQueuedCompletionStatus failed: {}", GetLastError());
+			continue;
 		}
 
-		OverlappedEx& ovEx = *CONTAINING_RECORD(ov, OverlappedEx, overlapped_);
-		if (ovEx.ioType_ == IO_TYPE::ACCEPT) {
-			Session* session = CONTAINING_RECORD(&ovEx, Session, readOv);
+		OverlappedEx& overlappedEx =
+			*CONTAINING_RECORD(overlapped, OverlappedEx, overlapped_);
+		if (overlappedEx.ioType_ == IO_TYPE::kAccept) {
+			Session* session =
+				CONTAINING_RECORD(&overlappedEx, Session, readOv_);
 			LOG_DEBUG("[Session:{}] IOType: {} BytesTransferred: {}",
-					  session->GetHandle(), static_cast<int>(ovEx.ioType_),
-					  bytesTransferred);
+					  session->GetHandle(),
+					  static_cast<int>(overlappedEx.ioType_), bytesTransferred);
 		} else {
-			Session* session = reinterpret_cast<Session*>(completionKey);
+			auto* session = reinterpret_cast<Session*>(completionKey);
 			LOG_DEBUG("[Session:{}] IOType: {} BytesTransferred: {}",
-					  session->GetHandle(), static_cast<int>(ovEx.ioType_),
-					  bytesTransferred);
+					  session->GetHandle(),
+					  static_cast<int>(overlappedEx.ioType_), bytesTransferred);
 		}
 
-		if (!result) {
+		if (result == FALSE) {
 			int error = WSAGetLastError();
 			if (error == WSA_OPERATION_ABORTED) {
 				LOG_INFO("IOCP is shutting down.");
 				break;
 			}
 
-			if (ovEx.ioType_ == IO_TYPE::ACCEPT) {
+			if (overlappedEx.ioType_ == IO_TYPE::kAccept) {
 				LOG_ERROR("Accept operation failed: {}", error);
 			} else {
 				LOG_ERROR("I/O operation failed: {}", error);
@@ -111,9 +109,9 @@ void IocpCore::WorkerThread() {
 			continue;
 		}
 
-		if (ovEx.ioType_ == IO_TYPE::ACCEPT) {
-			Listener* listener = reinterpret_cast<Listener*>(completionKey);
-			if (!listener->HandleAccept(ovEx)) {
+		if (overlappedEx.ioType_ == IO_TYPE::kAccept) {
+			auto* listener = reinterpret_cast<Listener*>(completionKey);
+			if (!listener->HandleAccept(overlappedEx)) {
 				LOG_ERROR("Failed to handle accept");
 			}
 		} else {
@@ -125,7 +123,7 @@ void IocpCore::WorkerThread() {
 				objPtr->Close();
 			}
 
-			if (!objPtr->HandleIO(ovEx, bytesTransferred)) {
+			if (!objPtr->HandleIO(overlappedEx, bytesTransferred)) {
 				LOG_ERROR("Failed to handle I/O operation");
 				objPtr->Close();
 			}

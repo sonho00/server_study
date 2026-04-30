@@ -80,8 +80,8 @@ bool Client::ReceiveByte(char* buffer, const size_t len) {
 }
 
 bool Client::HandlePacket(const PACKET_HEADER* header) {
-	if (header->id == static_cast<uint16_t>(C2S_PACKET_ID::MOVE)) {
-	} else if (header->id == static_cast<uint16_t>(C2S_PACKET_ID::CHAT)) {
+	if (header->id == static_cast<uint16_t>(C2S_PACKET_ID::kMove)) {
+	} else if (header->id == static_cast<uint16_t>(C2S_PACKET_ID::kChat)) {
 	} else {
 		LOG_WARN("Unknown packet ID received.");
 		return false;

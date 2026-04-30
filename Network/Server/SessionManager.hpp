@@ -15,7 +15,7 @@ class SessionManager {
 	void RemoveSession(size_t sessionId);
 
    private:
-	ObjectPool<Session, 4096> sessionPool_;
+	ObjectPool<Session, Config::kPoolSize> sessionPool_;
 	std::unordered_map<size_t, std::shared_ptr<Session>> sessions_;
 	std::mutex mutex_;
 	std::atomic<size_t> nextSessionId_ = 1;

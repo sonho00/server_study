@@ -10,19 +10,19 @@
 #include "PacketHandler.hpp"
 
 bool Session::RegisterRead() {
-	readOv.ioType_ = IO_TYPE::RECV;
-	readOv.wsaBuf_.buf = readOv.buffer_.GetBuffer() + readOv.writePos_;
-	readOv.wsaBuf_.len = readOv.buffer_.GetSize() - readOv.writePos_;
-	ZeroMemory(&readOv.overlapped_, sizeof(OVERLAPPED));
+	readOv_.ioType_ = IO_TYPE::kRecv;
+	readOv_.wsaBuf_.buf = readOv_.buffer_.GetBuffer() + readOv_.writePos_;
+	readOv_.wsaBuf_.len = readOv_.buffer_.GetSize() - readOv_.writePos_;
+	ZeroMemory(&readOv_.overlapped_, sizeof(OVERLAPPED));
 	DWORD flags = 0;
-	int recvResult = WSARecv(socket_, &readOv.wsaBuf_, 1, NULL, &flags,
-							 &readOv.overlapped_, NULL);
+	int recvResult = WSARecv(socket_, &readOv_.wsaBuf_, 1, nullptr, &flags,
+							 &readOv_.overlapped_, nullptr);
 
 	LOG_DEBUG(
 		"[Session:{}] Posted WSARecv - Overlapped: {} BufferPos:{}, "
 		"BufferLen:{}",
-		GetHandle(), static_cast<void*>(&readOv.overlapped_), readOv.writePos_,
-		readOv.wsaBuf_.len);
+		GetHandle(), static_cast<void*>(&readOv_.overlapped_),
+		readOv_.writePos_, readOv_.wsaBuf_.len);
 
 	if (recvResult == SOCKET_ERROR) {
 		int errorCode = WSAGetLastError();
@@ -39,19 +39,19 @@ bool Session::RegisterRead() {
 bool Session::RegisterWrite() {
 	// 이 함수는 mtx 락을 획득한 상태이고 isSending_가 true인 상태에서만
 	// 호출되어야 합니다.
-	writeOv.ioType_ = IO_TYPE::SEND;
-	writeOv.wsaBuf_.buf = writeOv.buffer_.GetBuffer() + writeOv.readPos_;
-	writeOv.wsaBuf_.len = writeOv.writePos_ - writeOv.readPos_;
-	ZeroMemory(&writeOv.overlapped_, sizeof(OVERLAPPED));
+	writeOv_.ioType_ = IO_TYPE::kSend;
+	writeOv_.wsaBuf_.buf = writeOv_.buffer_.GetBuffer() + writeOv_.readPos_;
+	writeOv_.wsaBuf_.len = writeOv_.writePos_ - writeOv_.readPos_;
+	ZeroMemory(&writeOv_.overlapped_, sizeof(OVERLAPPED));
 	DWORD flags = 0;
-	int sendResult = WSASend(socket_, &writeOv.wsaBuf_, 1, NULL, flags,
-							 &writeOv.overlapped_, NULL);
+	int sendResult = WSASend(socket_, &writeOv_.wsaBuf_, 1, nullptr, flags,
+							 &writeOv_.overlapped_, nullptr);
 
 	LOG_DEBUG(
 		"[Session:{}] Posted WSASend - Overlapped: {} BufferPos:{}, "
 		"BufferLen:{}",
-		GetHandle(), static_cast<void*>(&writeOv.overlapped_), writeOv.readPos_,
-		writeOv.wsaBuf_.len);
+		GetHandle(), static_cast<void*>(&writeOv_.overlapped_),
+		writeOv_.readPos_, writeOv_.wsaBuf_.len);
 
 	if (sendResult == SOCKET_ERROR) {
 		int errorCode = WSAGetLastError();
@@ -66,11 +66,11 @@ bool Session::RegisterWrite() {
 }
 
 bool Session::SendPacket(const PACKET_HEADER& header) {
-	std::lock_guard<std::mutex> lock(mtx);
+	std::lock_guard<std::mutex> lock(mtx_);
 
-	memcpy(writeOv.buffer_.GetBuffer() + writeOv.writePos_, &header,
+	memcpy(writeOv_.buffer_.GetBuffer() + writeOv_.writePos_, &header,
 		   header.size);
-	writeOv.writePos_ += header.size;
+	writeOv_.writePos_ += header.size;
 
 	if (!isSending_) {
 		isSending_ = true;
@@ -84,24 +84,24 @@ bool Session::SendPacket(const PACKET_HEADER& header) {
 	return true;
 }
 
-bool Session::OnRead(const DWORD bytesTransferred) {
-	if (readOv.writePos_ - readOv.readPos_ + bytesTransferred >
-		readOv.buffer_.GetSize()) {
+bool Session::OnRead(DWORD bytesTransferred) {
+	if (readOv_.writePos_ - readOv_.readPos_ + bytesTransferred >
+		readOv_.buffer_.GetSize()) {
 		LOG_ERROR("Read buffer overflow detected");
 		Close();
 		return false;
 	}
 
-	readOv.writePos_ += bytesTransferred;
+	readOv_.writePos_ += bytesTransferred;
 
 	while (true) {
-		size_t availableData = readOv.writePos_ - readOv.readPos_;
+		size_t availableData = readOv_.writePos_ - readOv_.readPos_;
 		if (availableData < sizeof(PACKET_HEADER)) break;
 
-		PACKET_HEADER* header = reinterpret_cast<PACKET_HEADER*>(
-			readOv.buffer_.GetBuffer() + readOv.readPos_);
+		auto* header = reinterpret_cast<PACKET_HEADER*>(
+			readOv_.buffer_.GetBuffer() + readOv_.readPos_);
 
-		if (header->size == 0 || header->size > readOv.buffer_.GetSize()) {
+		if (header->size == 0 || header->size > readOv_.buffer_.GetSize()) {
 			LOG_ERROR("Invalid packet size: {}", header->size);
 			Close();
 			return false;
@@ -116,12 +116,12 @@ bool Session::OnRead(const DWORD bytesTransferred) {
 			return false;
 		}
 
-		readOv.readPos_ += header->size;
+		readOv_.readPos_ += header->size;
 	}
 
-	if (readOv.readPos_ >= readOv.buffer_.GetSize()) {
-		readOv.readPos_ -= readOv.buffer_.GetSize();
-		readOv.writePos_ -= readOv.buffer_.GetSize();
+	if (readOv_.readPos_ >= readOv_.buffer_.GetSize()) {
+		readOv_.readPos_ -= readOv_.buffer_.GetSize();
+		readOv_.writePos_ -= readOv_.buffer_.GetSize();
 	}
 
 	if (!RegisterRead()) {
@@ -132,25 +132,25 @@ bool Session::OnRead(const DWORD bytesTransferred) {
 	return true;
 }
 
-bool Session::OnWrite(const DWORD bytesTransferred) {
+bool Session::OnWrite(DWORD bytesTransferred) {
 	// 이 함수가 호출될 때는 is sending_가 true인 상태입니다.
 
-	std::lock_guard<std::mutex> lock(mtx);
-	if (writeOv.writePos_ - writeOv.readPos_ + bytesTransferred >
-		writeOv.buffer_.GetSize()) {
+	std::lock_guard<std::mutex> lock(mtx_);
+	if (writeOv_.writePos_ - writeOv_.readPos_ + bytesTransferred >
+		writeOv_.buffer_.GetSize()) {
 		LOG_ERROR("Write buffer overflow detected");
 		Close();
 		return false;
 	}
 
-	writeOv.readPos_ += bytesTransferred;
+	writeOv_.readPos_ += bytesTransferred;
 
-	if (writeOv.readPos_ >= writeOv.buffer_.GetSize()) {
-		writeOv.readPos_ -= writeOv.buffer_.GetSize();
-		writeOv.writePos_ -= writeOv.buffer_.GetSize();
+	if (writeOv_.readPos_ >= writeOv_.buffer_.GetSize()) {
+		writeOv_.readPos_ -= writeOv_.buffer_.GetSize();
+		writeOv_.writePos_ -= writeOv_.buffer_.GetSize();
 	}
 
-	if (writeOv.readPos_ == writeOv.writePos_) {
+	if (writeOv_.readPos_ == writeOv_.writePos_) {
 		isSending_ = false;
 		return true;
 	}
@@ -163,11 +163,11 @@ bool Session::OnWrite(const DWORD bytesTransferred) {
 	return true;
 }
 
-bool Session::HandleIO(OverlappedEx& ovEx, const DWORD bytesTransferred) {
+bool Session::HandleIO(OverlappedEx& ovEx, DWORD bytesTransferred) {
 	switch (ovEx.ioType_) {
-		case IO_TYPE::RECV:
+		case IO_TYPE::kRecv:
 			return OnRead(bytesTransferred);
-		case IO_TYPE::SEND:
+		case IO_TYPE::kSend:
 			return OnWrite(bytesTransferred);
 		default:
 			LOG_ERROR("Unknown IO type");

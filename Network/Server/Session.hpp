@@ -12,41 +12,45 @@
 
 class SessionManager;
 
+struct BufferSizes {
+	size_t readBufferSize_ = 1 << 16;
+	size_t writeBufferSize_ = 1 << 16;
+};
+
 class Session : public PoolElement<Session> {
    public:
-	Session(const size_t readBufferSize = 1 << 16,
-			const size_t writeBufferSize = 1 << 16)
-		: readOv(readBufferSize), writeOv(writeBufferSize) {}
+	Session(const BufferSizes& bufferSizes = BufferSizes())
+		: readOv_(bufferSizes.readBufferSize_),
+		  writeOv_(bufferSizes.writeBufferSize_) {}
 
 	bool RegisterRead();
 	bool RegisterWrite();
-	bool SendPacket(const PACKET_HEADER& packet);
+	bool SendPacket(const PACKET_HEADER& header);
 
-	bool OnRead(const DWORD bytesTransferred);
-	bool OnWrite(const DWORD bytesTransferred);
-	bool HandleIO(OverlappedEx& ovEx, const DWORD bytesTransferred);
+	bool OnRead(DWORD bytesTransferred);
+	bool OnWrite(DWORD bytesTransferred);
+	bool HandleIO(OverlappedEx& ovEx, DWORD bytesTransferred);
 
 	void Close();
 
 	size_t GetSessionId() const { return sessionId_; }
-	void SetSessionId(const size_t sessionId) { sessionId_ = sessionId; }
+	void SetSessionId(size_t sessionId) { sessionId_ = sessionId; }
 
-	OverlappedEx readOv = {};
-	OverlappedEx writeOv = {};
+	OverlappedEx readOv_;
+	OverlappedEx writeOv_;
 	SOCKET socket_ = INVALID_SOCKET;
 
    private:
 	size_t sessionId_ = 0;
-	std::mutex mtx;
+	std::mutex mtx_;
 	bool isSending_ = false;
 
-	std::function<bool(const DWORD bytesTransferred)>
-		inputHandlers[static_cast<size_t>(IO_TYPE::CNT)] = {
+	std::array<std::function<bool(DWORD bytesTransferred)>,
+			   static_cast<size_t>(IO_TYPE::kCnt)>
+		inputHandlers_ = {
 			nullptr,
-			[this](const DWORD bytesTransferred) {
-				return OnRead(bytesTransferred);
-			},
-			[this](const DWORD bytesTransferred) {
+			[this](DWORD bytesTransferred) { return OnRead(bytesTransferred); },
+			[this](DWORD bytesTransferred) {
 				return OnWrite(bytesTransferred);
 			}};
 };
