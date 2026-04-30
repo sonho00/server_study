@@ -4,7 +4,7 @@
 
 #include <cstring>
 
-#include "Network/Common/NetUtils.hpp"
+#include "Network/Common/Logger.hpp"
 #include "Network/Common/Protocol.hpp"
 #include "OverlappedEx.hpp"
 #include "PacketHandler.hpp"

@@ -4,7 +4,7 @@
 
 #include "IocpCore.hpp"
 #include "Listener.hpp"
-#include "Network/Common/NetUtils.hpp"
+#include "Network/Common/Logger.hpp"
 #include "Network/Common/WSAManager.hpp"
 #include "Network/Server/SessionManager.hpp"
 #include "ServerUtils.hpp"

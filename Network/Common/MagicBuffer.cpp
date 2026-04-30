@@ -1,6 +1,6 @@
 #include "MagicBuffer.hpp"
 
-#include "NetUtils.hpp"
+#include "Logger.hpp"
 
 MagicBuffer::MagicBuffer(size_t size) : size_(size) {
 	SYSTEM_INFO sysInfo;

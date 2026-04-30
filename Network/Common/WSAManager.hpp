@@ -2,7 +2,7 @@
 
 #include <WinSock2.h>
 
-#include "NetUtils.hpp"
+#include "Logger.hpp"
 
 class WSAManager {
    public:

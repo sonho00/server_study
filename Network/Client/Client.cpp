@@ -2,7 +2,7 @@
 
 #include <ws2tcpip.h>
 
-#include "Network/Common/NetUtils.hpp"
+#include "Network/Common/Logger.hpp"
 #include "Network/Common/Protocol.hpp"
 
 Client::Client(const char* ipAddr, uint16_t port)
