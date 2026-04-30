@@ -4,9 +4,9 @@
 #include "Network/Common/Protocol.hpp"
 #include "Tests/Client.hpp"
 
-class Fragmentation : public Client {
+class StickyPackets : public Client {
    public:
-	Fragmentation(const char* ip, const uint16_t port) : Client(ip, port) {}
+	StickyPackets(const char* ip, const uint16_t port) : Client(ip, port) {}
 	void ThreadFunc() override {
 		char buf[405]{};
 		auto* packet = reinterpret_cast<C2S_CHAT*>(buf);
