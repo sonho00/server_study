@@ -1,79 +1,18 @@
 #pragma once
 
-#include <cstdint>
+#include <array>
 #include <memory>
-#include <mutex>
-#include <numeric>
 
-#include "Network/Common/Config.hpp"
-
-template <typename T>
-class PoolElement : public std ::enable_shared_from_this<T> {
-	template <typename U, size_t N>
-		requires std::derived_from<U, PoolElement<U>>
-	friend class ObjectPool;
-
-   public:
-	[[nodiscard]] uint64_t GetHandle() const {
-		return (static_cast<uint64_t>(generation_)
-				<< (sizeof(uint32_t) * CHAR_BIT)) |
-			   who_;
-	}
-
-   private:
-	size_t where_ = 0;
-	size_t who_ = 0;
-	size_t generation_ = 0;
-};
-
-template <typename T, size_t PoolSize = Config::kPoolSize>
-	requires std::derived_from<T, PoolElement<T>>
+template <typename T, size_t N>
+	requires std::derived_from<T, std::enable_shared_from_this<T>>
 class ObjectPool {
    public:
-	ObjectPool() { std::iota(std::begin(who_), std::end(who_), 0); }
-
-	std::shared_ptr<T> Acquire();
+	template <typename... Args>
+	std::shared_ptr<T> Acquire(size_t idx, Args&&... args) {
+		T* obj = new (&pool_[idx * sizeof(T)]) T(std::forward<Args>(args)...);
+		return std::shared_ptr<T>(obj, [this, idx](T* ptr) { ptr->~T(); });
+	};
 
    private:
-	void Release(T* obj);
-
-	alignas(T) std::array<std::byte, sizeof(T) * PoolSize> pool_;
-	std::array<uint32_t, PoolSize> who_;
-	std::array<uint32_t, PoolSize> generation_{};
-	size_t activeCount_ = 0;
-	std::mutex mutex_;
+	alignas(T) std::array<std::byte, sizeof(T) * N> pool_;
 };
-
-template <typename T, size_t PoolSize>
-	requires std::derived_from<T, PoolElement<T>>
-std::shared_ptr<T> ObjectPool<T, PoolSize>::Acquire() {
-	size_t newPerson;
-	T* obj = nullptr;
-	{
-		std::lock_guard<std::mutex> lock(mutex_);
-		if (activeCount_ >= PoolSize) {
-			return nullptr;
-		}
-		newPerson = who_[activeCount_];
-		obj = new (&pool_[newPerson * sizeof(T)]) T();
-		obj->where_ = activeCount_;
-		++activeCount_;
-	}
-	obj->who_ = newPerson;
-	obj->generation_ = generation_[newPerson];
-
-	return std::shared_ptr<T>(obj, [this](T* obj) { Release(obj); });
-}
-
-template <typename T, size_t PoolSize>
-	requires std::derived_from<T, PoolElement<T>>
-void ObjectPool<T, PoolSize>::Release(T* obj) {
-	std::lock_guard<std::mutex> lock(mutex_);
-	--activeCount_;
-	T* lastPerson =
-		reinterpret_cast<T*>(&pool_[who_[activeCount_] * sizeof(T)]);
-	lastPerson->where_ = obj->where_;
-	std::swap(who_[obj->where_], who_[activeCount_]);
-	++generation_[obj->who_];
-	obj->~T();
-}

@@ -1,22 +1,20 @@
 #pragma once
 
-#include <atomic>
 #include <memory>
-#include <mutex>
-#include <unordered_map>
 
 #include "Network/Common/ObjectPool.hpp"
+#include "Network/Common/SparseSet.hpp"
 #include "Session.hpp"
 
 class SessionManager {
    public:
 	std::shared_ptr<Session> CreateSession();
-	void AddSession(Session& session);
-	void RemoveSession(size_t sessionId);
+	bool AddSession(Session& session);
+	bool RemoveSession(uint64_t sessionHandle);
 
    private:
+	SparseSet<Config::kPoolSize> createdSessions_;
+	SparseSet<Config::kPoolSize> activeSessions_;
 	ObjectPool<Session, Config::kPoolSize> sessionPool_;
-	std::unordered_map<size_t, std::shared_ptr<Session>> sessions_;
-	std::mutex mutex_;
-	std::atomic<size_t> nextSessionId_ = 1;
+	std::array<std::shared_ptr<Session>, Config::kPoolSize> sessionHandles_;
 };

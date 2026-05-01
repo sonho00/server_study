@@ -6,7 +6,6 @@
 #include <functional>
 #include <mutex>
 
-#include "Network/Common/ObjectPool.hpp"
 #include "Network/Common/Protocol.hpp"
 #include "OverlappedEx.hpp"
 
@@ -17,7 +16,7 @@ struct BufferSizes {
 	size_t writeBufferSize_ = 1 << 16;
 };
 
-class Session : public PoolElement<Session> {
+class Session : public std::enable_shared_from_this<Session> {
    public:
 	Session(const BufferSizes& bufferSizes = BufferSizes())
 		: readOv_(bufferSizes.readBufferSize_),
@@ -33,15 +32,15 @@ class Session : public PoolElement<Session> {
 
 	void Close();
 
-	size_t GetSessionId() const { return sessionId_; }
-	void SetSessionId(size_t sessionId) { sessionId_ = sessionId; }
+	[[nodiscard]] uint64_t GetHandle() const { return handle_; }
+	void SetHandle(uint64_t handle) { handle_ = handle; }
 
 	OverlappedEx readOv_;
 	OverlappedEx writeOv_;
 	SOCKET socket_ = INVALID_SOCKET;
 
    private:
-	size_t sessionId_ = 0;
+	uint64_t handle_ = 0;
 	std::mutex mtx_;
 	bool isSending_ = false;
 

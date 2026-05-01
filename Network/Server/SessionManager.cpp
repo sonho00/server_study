@@ -1,22 +1,38 @@
 #include "SessionManager.hpp"
 
+#include "Network/Common/Logger.hpp"
+
 std::shared_ptr<Session> SessionManager::CreateSession() {
-	auto session = sessionPool_.Acquire();
-	if (!session) {
+	auto handle = createdSessions_.Pop();
+	if (!handle.has_value()) {
+		LOG_ERROR("Failed to create session: No available handles");
 		return nullptr;
 	}
-
+	auto session = sessionPool_.Acquire(handle.value());
+	session->SetHandle(handle.value());
 	return session;
 }
 
-void SessionManager::AddSession(Session& session) {
-	session.SetSessionId(nextSessionId_++);
-
-	std::lock_guard<std::mutex> lock(mutex_);
-	sessions_[session.GetSessionId()] = session.shared_from_this();
+bool SessionManager::AddSession(Session& session) {
+	uint64_t sessionHandle = session.GetHandle();
+	if (!activeSessions_.Pop(sessionHandle)) {
+		LOG_ERROR("Failed to add session with handle: {}", sessionHandle);
+		return false;
+	}
+	sessionHandles_[sessionHandle] = session.shared_from_this();
+	return true;
 }
 
-void SessionManager::RemoveSession(size_t sessionId) {
-	std::lock_guard<std::mutex> lock(mutex_);
-	sessions_.erase(sessionId);
+bool SessionManager::RemoveSession(uint64_t sessionHandle) {
+	if (!activeSessions_.Push(sessionHandle)) {
+		LOG_ERROR("Failed to remove session with handle: {}", sessionHandle);
+		return false;
+	}
+	if (!createdSessions_.Push(sessionHandle)) {
+		LOG_ERROR("Failed to return session handle to createdSessions: {}",
+				  sessionHandle);
+		return false;
+	}
+	sessionHandles_[sessionHandle].reset();
+	return true;
 }
