@@ -14,11 +14,16 @@ class ISparsePool {
 		std::atomic<size_t> refCount_;
 	};
 
+	virtual ~ISparsePool() = default;
+
 	[[nodiscard]] virtual bool IsValid(uint64_t handle) const = 0;
 
 	[[nodiscard]] virtual T* Get(uint64_t handle) = 0;
 	virtual bool Release(uint64_t handle) = 0;
 };
+
+template <typename T>
+concept has_reset = requires(T obj) { obj.Reset(); };
 
 template <typename T, size_t N, bool isLazy = false>
 class SparsePool : public ISparsePool<T> {
@@ -33,6 +38,15 @@ class SparsePool : public ISparsePool<T> {
 		}
 	}
 
+	~SparsePool() {
+		if constexpr (!isLazy) {
+			for (size_t i = 0; i < N; ++i) {
+				auto& slot = reinterpret_cast<Slot&>(pool_[i * sizeof(Slot)]);
+				slot.obj_.~T();
+			}
+		}
+	}
+
 	template <typename... Args>
 	std::shared_ptr<T> Acquire(Args&&... args) {
 		uint64_t handle = sparseSet_.Pop();
@@ -42,7 +56,12 @@ class SparsePool : public ISparsePool<T> {
 		auto idx = static_cast<uint32_t>(handle);
 
 		auto& slot = reinterpret_cast<Slot&>(pool_[idx * sizeof(Slot)]);
-		if constexpr (isLazy) slot.obj_ = T(std::forward<Args>(args)...);
+
+		if constexpr (isLazy) {
+			new (&slot.obj_) T(std::forward<Args>(args)...);
+		} else if constexpr (has_reset<T>) {
+			slot.obj_.Reset(std::forward<Args>(args)...);
+		}
 		slot.obj_.SetHandle(handle);
 		return std::shared_ptr<T>(&slot.obj_, [this, idx](T* ptr) {
 			if constexpr (isLazy) ptr->~T();
