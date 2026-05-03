@@ -71,14 +71,14 @@ bool Listener::HandleAccept(const OverlappedEx& ovEx) {
 }
 
 bool Listener::PostAccept() {
-	SOCKET hAcceptSocket = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, NULL, 0,
-									 WSA_FLAG_OVERLAPPED);
+	SOCKET hAcceptSocket = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, nullptr,
+									 0, WSA_FLAG_OVERLAPPED);
 	if (hAcceptSocket == INVALID_SOCKET) {
 		LOG_ERROR("Failed to create accept socket");
 		return false;
 	}
 
-	std::shared_ptr<Session> session = sessionManager_.CreateSession();
+	auto session = sessionManager_.CreateSession();
 	if (!session) return false;
 
 	session->readOv_.ioType_ = IO_TYPE::kAccept;
@@ -87,8 +87,7 @@ bool Listener::PostAccept() {
 		static_cast<ULONG>(session->readOv_.buffer_.GetSize());
 	session->socket_ = hAcceptSocket;
 
-	if (!iocpCore_.Register(hAcceptSocket,
-							reinterpret_cast<ULONG_PTR>(session.get()))) {
+	if (!iocpCore_.Register(hAcceptSocket, session->GetHandle())) {
 		LOG_ERROR("Failed to register accept socket with IOCP");
 		session->Close();
 		return false;

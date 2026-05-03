@@ -24,13 +24,42 @@ class SharedPoolPtr {
 		other.handle_ = 0;
 	}
 
+	SharedPoolPtr(std::nullptr_t = nullptr) : pool_(nullptr), handle_(0) {}
+
 	~SharedPoolPtr() {
 		if (pool_) {
 			pool_->ReleaseRef(handle_);
 		}
 	}
 
+	SharedPoolPtr& operator=(const SharedPoolPtr& other) {
+		if (this != &other) {
+			if (pool_) {
+				pool_->ReleaseRef(handle_);
+			}
+			pool_ = other.pool_;
+			handle_ = other.handle_;
+			if (pool_) {
+				pool_->AddRef(handle_);
+			}
+		}
+		return *this;
+	}
+
+	[[nodiscard]] explicit operator bool() const {
+		return pool_ && pool_->IsValid(handle_);
+	}
+
+	[[nodiscard]] T* Get() const { return pool_->Get(handle_); }
+
 	T* operator->() { return pool_->Get(handle_); }
+
+	[[nodiscard]] T& operator*() const { return *pool_->Get(handle_); }
+
+	void Reset() {
+		pool_ = nullptr;
+		handle_ = 0;
+	}
 
    private:
 	ISparsePool<T>* pool_;

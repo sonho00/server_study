@@ -7,6 +7,8 @@
 
 #include "OverlappedEx.hpp"
 
+class SessionManager;
+
 struct IocpResult {
 	BOOL result_;
 	DWORD bytesTransferred_;
@@ -16,7 +18,7 @@ struct IocpResult {
 
 class IocpCore {
    public:
-	IocpCore();
+	IocpCore(SessionManager& sessionManager);
 	~IocpCore();
 
 	bool Start(size_t threadCount);
@@ -24,10 +26,11 @@ class IocpCore {
 
    private:
 	void WorkerThread();
-	static void LogIOEvent(const IocpResult& iocpResult);
-	static void Dispatch(const IocpResult& iocpResult);
-	static bool HandleError(const IocpResult& iocpResult);
+	void LogIOEvent(const IocpResult& iocpResult);
+	void Dispatch(const IocpResult& iocpResult);
+	bool HandleError(const IocpResult& iocpResult);
 
 	std::vector<std::thread> threads_;
 	HANDLE hIocp_;
+	SessionManager& sessionManager_;
 };

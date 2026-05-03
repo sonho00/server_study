@@ -2,7 +2,8 @@
 
 #include <atomic>
 
-#include "Network/Common/Logger.hpp"
+#include "Logger.hpp"
+#include "SharedPoolPtr.hpp"
 #include "SparseSet.hpp"
 
 template <typename T>
@@ -51,7 +52,7 @@ class SparsePool : public ISparsePool<T> {
 	}
 
 	template <typename... Args>
-	std::shared_ptr<T> Acquire(Args&&... args) {
+	SharedPoolPtr<T> Acquire(Args&&... args) {
 		uint64_t handle = sparseSet_.Pop();
 		if (handle == SparseSet<N>::kInvalidHandle) {
 			return nullptr;
@@ -66,10 +67,7 @@ class SparsePool : public ISparsePool<T> {
 			slot.obj_.Reset(std::forward<Args>(args)...);
 		}
 		slot.obj_.SetHandle(handle);
-		return std::shared_ptr<T>(&slot.obj_, [this, idx](T* ptr) {
-			if constexpr (isLazy) ptr->~T();
-			sparseSet_.Push(idx);
-		});
+		return SharedPoolPtr<T>(this, handle);
 	};
 
 	[[nodiscard]] bool AddRef(uint64_t handle) override {

@@ -12,7 +12,8 @@
 class ServerService {
    public:
 	ServerService()
-		: listener_(iocpCore_, sessionManager_, Config::kPort,
+		: iocpCore_(sessionManager_),
+		  listener_(iocpCore_, sessionManager_, Config::kPort,
 					netFuncs_.acceptEx_) {}
 
 	bool Start() {
@@ -34,7 +35,7 @@ class ServerService {
    private:
 	WSAManager wsaManager_;
 	ServerUtils::NetFuncs netFuncs_;
-	IocpCore iocpCore_;
 	SessionManager sessionManager_;
+	IocpCore iocpCore_;
 	Listener listener_;
 };

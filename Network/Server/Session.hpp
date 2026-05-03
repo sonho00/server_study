@@ -17,7 +17,7 @@ struct BufferSizes {
 	size_t writeBufferSize_ = 1 << 16;
 };
 
-class Session : public std::enable_shared_from_this<Session> {
+class Session {
    public:
 	Session(const BufferSizes& bufferSizes = BufferSizes())
 		: readOv_(bufferSizes.readBufferSize_),
