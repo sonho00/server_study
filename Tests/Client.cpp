@@ -2,6 +2,8 @@
 
 #include <ws2tcpip.h>
 
+#include <thread>
+
 #include "Network/Common/Logger.hpp"
 #include "Network/Common/Protocol.hpp"
 
@@ -85,7 +87,7 @@ PACKET_HEADER* Client::ReceivePacket(char* buffer) {
 
 	auto* header = reinterpret_cast<PACKET_HEADER*>(buffer);
 	if (header->size < sizeof(PACKET_HEADER) ||
-		static_cast<size_t>(header->size) > buffer_.size()) {
+		static_cast<size_t>(header->size) > recvBuf_.size()) {
 		LOG_WARN("Invalid packet size received: {}", header->size);
 		return nullptr;
 	}
@@ -111,4 +113,10 @@ bool Client::HandlePacket(const PACKET_HEADER& header) {
 	}
 
 	return true;
+}
+
+bool Client::test() {
+	std::thread clientThread(&Client::ThreadFunc, this);
+	clientThread.join();
+	return memcmp(sendBuf_.data(), recvBuf_.data(), testBytes_) == 0;
 }

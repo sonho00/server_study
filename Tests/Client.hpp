@@ -21,7 +21,14 @@ class Client {
 
 	virtual void ThreadFunc() = 0;
 
+	bool test();
+
+	bool success_ = true;
+	size_t testBytes_ = 0;
+
+	static std::array<char, 1 << 20> sendBuf_;
+	static std::array<char, 1 << 20> recvBuf_;
+
    protected:
-	std::array<char, Config::kClientBufferSize> buffer_{};
 	SOCKET socket_;
 };

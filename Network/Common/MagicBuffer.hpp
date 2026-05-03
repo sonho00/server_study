@@ -4,7 +4,6 @@
 
 class MagicBuffer {
    public:
-	MagicBuffer() = default;
 	MagicBuffer(size_t size);
 	~MagicBuffer();
 

@@ -25,7 +25,7 @@
 
 namespace NetUtils {
 enum class LogLevel : std::uint8_t { kDebug, kInfo, kWarn, kError, kFatal };
-inline LogLevel gLogLevel = LogLevel::kDebug;
+constexpr inline LogLevel kLogLevel = LogLevel::kInfo;
 
 inline std::string_view GetLevelStr(LogLevel level) {
 	switch (level) {
@@ -48,7 +48,7 @@ template <typename... Args>
 inline void LogInfo(LogLevel level, std::string_view fmt_str, Args&&... args) {
 	auto now = std::chrono::system_clock::now();
 	try {
-		if (level < gLogLevel) return;
+		if (level < kLogLevel) return;
 		std::string msg = std::vformat(fmt_str, std::make_format_args(args...));
 
 		std::cout << std::format("[{:%F %T}][{}]{}\n", now, GetLevelStr(level),
@@ -64,7 +64,7 @@ inline void LogError(LogLevel level, std::string_view fmt_str,
 					 std::source_location location, Args&&... args) {
 	auto now = std::chrono::system_clock::now();
 	try {
-		if (level < gLogLevel) return;
+		if (level < kLogLevel) return;
 		std::string msg = std::vformat(fmt_str, std::make_format_args(args...));
 
 		std::cerr << std::format("[{:%F %T}][{}][{}:{}]{}\n", now,
