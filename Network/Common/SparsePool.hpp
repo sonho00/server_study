@@ -16,6 +16,9 @@ class ISparsePool {
 
 	virtual ~ISparsePool() = default;
 
+	virtual bool AddRef(uint64_t handle) = 0;
+	virtual bool ReleaseRef(uint64_t handle) = 0;
+
 	[[nodiscard]] virtual bool IsValid(uint64_t handle) const = 0;
 
 	[[nodiscard]] virtual T* Get(uint64_t handle) = 0;
@@ -68,6 +71,31 @@ class SparsePool : public ISparsePool<T> {
 			sparseSet_.Push(idx);
 		});
 	};
+
+	[[nodiscard]] bool AddRef(uint64_t handle) override {
+		if (!IsValid(handle)) {
+			LOG_ERROR("Invalid handle: {}", handle);
+			return false;
+		}
+		auto idx = static_cast<uint32_t>(handle);
+		auto& slot = reinterpret_cast<Slot&>(pool_[idx * sizeof(Slot)]);
+		slot.refCount_.fetch_add(1, std::memory_order_acq_rel);
+		return true;
+	}
+
+	[[nodiscard]] bool ReleaseRef(uint64_t handle) override {
+		if (!IsValid(handle)) {
+			LOG_ERROR("Invalid handle: {}", handle);
+			return false;
+		}
+		auto idx = static_cast<uint32_t>(handle);
+		auto& slot = reinterpret_cast<Slot&>(pool_[idx * sizeof(Slot)]);
+		if (slot.refCount_.fetch_sub(1, std::memory_order_acq_rel) == 1) {
+			if constexpr (isLazy) slot.obj_.~T();
+			sparseSet_.Push(idx);
+		}
+		return true;
+	}
 
 	[[nodiscard]] bool IsValid(uint64_t handle) const override {
 		return sparseSet_.IsValid(handle);
