@@ -3,11 +3,12 @@
 #include <cstdint>
 
 #include "Network/Common/Logger.hpp"
-#include "Network/Common/SparseSet.hpp"
+#include "Network/Common/SharedPoolPtr.hpp"
+#include "Network/Common/SparsePool.hpp"
 
-std::shared_ptr<Session> SessionManager::CreateSession() {
+SharedPoolPtr<Session> SessionManager::CreateSession() {
 	auto session = sessionPool_.Acquire();
-	if (session == nullptr) {
+	if (!session) {
 		LOG_ERROR("Failed to create session: No available handles");
 		return nullptr;
 	}
@@ -34,6 +35,15 @@ bool SessionManager::RemoveSession(uint64_t handle) {
 		LOG_ERROR("Failed to return session handle to sessionPool: {}", handle);
 		return false;
 	}
-	sessionPtrs_[handle].reset();
+	sessionPtrs_[handle].Reset();
 	return true;
+}
+
+SharedPoolPtr<Session> SessionManager::GetSession(uint64_t handle) {
+	if (!sessionPool_.IsValid(handle)) {
+		LOG_DEBUG("Invalid session handle: {}", handle);
+		return nullptr;
+	}
+	auto idx = static_cast<uint32_t>(handle);
+	return sessionPtrs_[idx];
 }

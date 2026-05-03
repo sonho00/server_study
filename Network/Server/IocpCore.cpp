@@ -4,14 +4,16 @@
 #include <WinSock2.h>
 #include <ioapiset.h>
 
-#include <memory>
 #include <thread>
 
 #include "Listener.hpp"
 #include "Network/Common/Logger.hpp"
+#include "Network/Common/SharedPoolPtr.hpp"
 #include "Session.hpp"
+#include "SessionManager.hpp"
 
-IocpCore::IocpCore() {
+IocpCore::IocpCore(SessionManager& sessionManager)
+	: sessionManager_(sessionManager) {
 	hIocp_ = CreateIoCompletionPort(INVALID_HANDLE_VALUE, nullptr, 0, 0);
 	if (hIocp_ == nullptr) {
 		LOG_FATAL("Failed to create IOCP: {}", GetLastError());
@@ -85,9 +87,8 @@ bool IocpCore::HandleError(const IocpResult& iocpResult) {
 	} else {
 		LOG_ERROR("I/O operation failed: {}", error);
 
-		std::shared_ptr<Session> objPtr =
-			reinterpret_cast<Session*>(iocpResult.completionKey_)
-				->shared_from_this();
+		SharedPoolPtr<Session> objPtr =
+			sessionManager_.GetSession(iocpResult.completionKey_);
 		objPtr->Close();
 	}
 	return false;
@@ -100,7 +101,8 @@ void IocpCore::LogIOEvent(const IocpResult& iocpResult) {
 		LOG_INFO("[Listener] Accepted new connection - Session Handle: {}",
 				 session->GetHandle());
 	} else {
-		auto* session = reinterpret_cast<Session*>(iocpResult.completionKey_);
+		SharedPoolPtr<Session> session =
+			sessionManager_.GetSession(iocpResult.completionKey_);
 		LOG_DEBUG("[Session:{}] IOType: {} BytesTransferred: {}",
 				  session->GetHandle(),
 				  static_cast<int>(iocpResult.overlappedEx_->ioType_),
@@ -116,9 +118,8 @@ void IocpCore::Dispatch(const IocpResult& iocpResult) {
 			LOG_ERROR("Failed to handle accept");
 		}
 	} else {
-		std::shared_ptr<Session> objPtr =
-			reinterpret_cast<Session*>(iocpResult.completionKey_)
-				->shared_from_this();
+		SharedPoolPtr<Session> objPtr =
+			sessionManager_.GetSession(iocpResult.completionKey_);
 
 		if (iocpResult.bytesTransferred_ == 0) {
 			LOG_INFO("[Session:{}] Connection closed by client",

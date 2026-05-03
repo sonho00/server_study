@@ -15,7 +15,6 @@ bool Session::RegisterRead() {
 	readOv_.wsaBuf_.len =
 		readOv_.buffer_.GetSize() - readOv_.writePos_ + readOv_.readPos_;
 	ZeroMemory(&readOv_.overlapped_, sizeof(OVERLAPPED));
-	readOv_.owner_ = shared_from_this();
 
 	DWORD flags = 0;
 	int recvResult = WSARecv(socket_, &readOv_.wsaBuf_, 1, nullptr, &flags,
@@ -47,7 +46,6 @@ bool Session::RegisterWrite() {
 	writeOv_.wsaBuf_.buf = writeOv_.buffer_.GetBuffer() + writeOv_.readPos_;
 	writeOv_.wsaBuf_.len = writeOv_.writePos_ - writeOv_.readPos_;
 	ZeroMemory(&writeOv_.overlapped_, sizeof(OVERLAPPED));
-	writeOv_.owner_ = shared_from_this();
 
 	DWORD flags = 0;
 	int sendResult = WSASend(socket_, &writeOv_.wsaBuf_, 1, nullptr, flags,
@@ -184,8 +182,6 @@ bool Session::HandleIO(OverlappedEx& ovEx, DWORD bytesTransferred) {
 			LOG_ERROR("[Session:{}] Unknown IO type", GetHandle());
 			return false;
 	}
-
-	ovEx.owner_ = nullptr;
 }
 
 void Session::Close() {
