@@ -1,8 +1,10 @@
 #pragma once
 
+#include <array>
 #include <memory>
 
-#include "Network/Common/ObjectPool.hpp"
+#include "Network/Common/Config.hpp"
+#include "Network/Common/SparsePool.hpp"
 #include "Network/Common/SparseSet.hpp"
 #include "Session.hpp"
 
@@ -13,8 +15,7 @@ class SessionManager {
 	bool RemoveSession(uint64_t sessionHandle);
 
    private:
-	SparseSet<Config::kPoolSize> createdSessions_;
+	SparsePool<Session, Config::kPoolSize> createdSessions_;
 	SparseSet<Config::kPoolSize> activeSessions_;
-	ObjectPool<Session, Config::kPoolSize> sessionPool_;
 	std::array<std::shared_ptr<Session>, Config::kPoolSize> sessionHandles_;
 };

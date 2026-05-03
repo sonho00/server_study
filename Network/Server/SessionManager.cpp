@@ -4,14 +4,12 @@
 #include "Network/Common/SparseSet.hpp"
 
 std::shared_ptr<Session> SessionManager::CreateSession() {
-	auto handle = createdSessions_.Pop();
-	if (handle == SparseSet<Config::kPoolSize>::kInvalidHandle) {
+	auto session = createdSessions_.Acquire();
+	if (session == nullptr) {
 		LOG_ERROR("Failed to create session: No available handles");
 		return nullptr;
 	}
-	
-	auto session = sessionPool_.Acquire(handle);
-	session->SetHandle(handle);
+
 	return session;
 }
 
@@ -30,7 +28,7 @@ bool SessionManager::RemoveSession(uint64_t sessionHandle) {
 		LOG_ERROR("Failed to remove session with handle: {}", sessionHandle);
 		return false;
 	}
-	if (!createdSessions_.Push(sessionHandle)) {
+	if (!createdSessions_.Release(sessionHandle)) {
 		LOG_ERROR("Failed to return session handle to createdSessions: {}",
 				  sessionHandle);
 		return false;
