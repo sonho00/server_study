@@ -4,6 +4,7 @@
 
 #include <cstddef>
 #include <functional>
+#include <memory>
 #include <mutex>
 
 #include "Network/Common/Protocol.hpp"

@@ -11,11 +11,11 @@
 class SessionManager {
    public:
 	std::shared_ptr<Session> CreateSession();
-	bool AddSession(Session& session);
-	bool RemoveSession(uint64_t sessionHandle);
+	bool AddSession(uint64_t handle);
+	bool RemoveSession(uint64_t handle);
 
    private:
-	SparsePool<Session, Config::kPoolSize> createdSessions_;
+	SparsePool<Session, Config::kPoolSize> sessionPool_;
 	SparseSet<Config::kPoolSize> activeSessions_;
-	std::array<std::shared_ptr<Session>, Config::kPoolSize> sessionHandles_;
+	std::array<std::shared_ptr<Session>, Config::kPoolSize> sessionPtrs_;
 };

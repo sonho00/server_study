@@ -59,8 +59,7 @@ bool Listener::HandleAccept(const OverlappedEx& ovEx) {
 		return false;
 	}
 
-	sessionManager_.AddSession(session);
-	session.readOv_.owner_ = nullptr;
+	sessionManager_.AddSession(session.GetHandle());
 
 	if (!session.RegisterRead()) {
 		LOG_ERROR("Failed to post initial read");
@@ -81,8 +80,6 @@ bool Listener::PostAccept() {
 
 	std::shared_ptr<Session> session = sessionManager_.CreateSession();
 	if (!session) return false;
-
-	session->readOv_.owner_ = session;
 
 	session->readOv_.ioType_ = IO_TYPE::kAccept;
 	session->readOv_.wsaBuf_.buf = session->readOv_.buffer_.GetBuffer();
