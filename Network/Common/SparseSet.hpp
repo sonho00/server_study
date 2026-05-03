@@ -24,6 +24,8 @@ class SparseSet {
 	bool Pop(uint64_t handle);
 	bool Push(uint64_t handle);
 
+	[[nodiscard]] bool IsValid(uint64_t handle) const;
+
 	[[nodiscard]] std::vector<uint64_t> GetActiveIndices();
 
    private:
@@ -105,7 +107,14 @@ bool SparseSet<N>::Push(uint64_t handle) {
 }
 
 template <size_t N>
-[[nodiscard]] std::vector<uint64_t> SparseSet<N>::GetActiveIndices() {
+bool SparseSet<N>::IsValid(uint64_t handle) const {
+	auto who = static_cast<uint32_t>(handle);
+	auto generation = static_cast<uint32_t>(handle >> kIndexShift);
+	return who < N && sparse_[who].generation_ == generation;
+}
+
+template <size_t N>
+std::vector<uint64_t> SparseSet<N>::GetActiveIndices() {
 	std::lock_guard<std::mutex> lock(mutex_);
 	std::vector<uint64_t> activeIndicies;
 	activeIndicies.insert(activeIndicies.end(), dense_.begin(),
