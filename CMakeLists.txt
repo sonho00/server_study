@@ -63,9 +63,15 @@ add_custom_target(run-client
 )
 
 # 테스트 실행 타겟
-add_custom_target(run-${TEST_TARGET_NAME}
-    COMMAND ${TEST_TARGET_NAME}
-    DEPENDS ${TEST_TARGET_NAME}
-    WORKING_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
-    COMMENT "Running ${TEST_TARGET_NAME}..."
-)
+foreach(test ${TEST_DIRS})
+    string(REGEX MATCH "[0-9][0-9]" TEST_NUM ${test})
+    set(TEST_TARGET_NAME test_${TEST_NUM})
+
+    add_custom_target(run-${TEST_TARGET_NAME}
+        COMMAND ${TEST_TARGET_NAME}
+        DEPENDS ${TEST_TARGET_NAME}
+        WORKING_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/Tests
+        COMMENT "Building and Running ${TEST_TARGET_NAME}..."
+    )
+
+endforeach(test ${TEST_DIRS})

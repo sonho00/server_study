@@ -30,9 +30,16 @@ class StickyPackets : public Client {
 		for (int i = 0; i < 3; ++i) {
 			recv(socket_, buf + i * 50004, 50004, 0);
 			std::cout << std::format(
-				"{} {}\n",
+				"\n{} {}\n",
 				reinterpret_cast<PACKET_HEADER*>(buf + i * 50004)->id,
 				reinterpret_cast<PACKET_HEADER*>(buf + i * 50004)->size);
+			for (int j = 0; j < 10000; ++j) {
+				if (j % 100) continue;
+				std::cout << std::format(
+					"{} ",
+					std::string(buf + i * 50004 + sizeof(PACKET_HEADER) + j * 5,
+								5));
+			}
 		}
 	}
 };
