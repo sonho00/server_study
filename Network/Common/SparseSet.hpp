@@ -12,7 +12,7 @@ template <size_t N>
 class SparseSet {
    public:
 	struct Slot {
-		uint32_t where_ = 0;
+		size_t where_ = 0;
 		uint32_t generation_ = 0;
 	};
 

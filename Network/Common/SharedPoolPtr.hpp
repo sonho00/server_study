@@ -56,15 +56,18 @@ SharedPoolPtr<T>::SharedPoolPtr(std::nullptr_t) : pool_(nullptr), handle_(0) {}
 
 template <typename T>
 SharedPoolPtr<T>& SharedPoolPtr<T>::operator=(const SharedPoolPtr& other) {
-	if (this != &other) {
-		if (pool_) {
-			pool_->ReleaseRef(handle_);
-		}
-		pool_ = other.pool_;
-		handle_ = other.handle_;
-		if (pool_) {
-			pool_->AddRef(handle_);
-		}
+	if (this == &other) {
+		return *this;
+	}
+	auto currentPool = pool_;
+	auto currentHandle = handle_;
+	pool_ = other.pool_;
+	handle_ = other.handle_;
+	if (pool_) {
+		pool_->AddRef(handle_);
+	}
+	if (currentPool) {
+		currentPool->ReleaseRef(currentHandle);
 	}
 	return *this;
 }
