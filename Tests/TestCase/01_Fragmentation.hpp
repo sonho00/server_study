@@ -21,8 +21,18 @@ class Fragmentation : public Client {
 
 		for (int i = 0; i < 404; ++i) {
 			int result = send(socket_, sendBuf_.data() + i, 1, 0);
+			if (result == SOCKET_ERROR) {
+				success_ = false;
+				LOG_ERROR("Failed to send byte {}: {}", i, WSAGetLastError());
+				return;
+			}
 		}
 
-		recv(socket_, recvBuf_.data(), 404, 0);
+		int result = recv(socket_, recvBuf_.data(), 404, 0);
+		if (result == SOCKET_ERROR) {
+			success_ = false;
+			LOG_ERROR("Failed to receive data: {}", WSAGetLastError());
+			return;
+		}
 	}
 };

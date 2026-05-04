@@ -1,7 +1,9 @@
 #pragma once
 
 #include <cstdio>
+#include <cstring>
 
+#include "Network/Common/Logger.hpp"
 #include "Network/Common/Protocol.hpp"
 #include "Tests/Client.hpp"
 
@@ -20,7 +22,19 @@ class StickyPackets : public Client {
 
 		memcpy(sendBuf_.data() + 50004, sendBuf_.data(), 50004);
 		memcpy(sendBuf_.data() + 100008, sendBuf_.data(), 50004);
-		send(socket_, sendBuf_.data(), 150012, 0);
-		recv(socket_, recvBuf_.data(), 150012, 0);
+
+		int result;
+		result = send(socket_, sendBuf_.data(), 150012, 0);
+		if (result == SOCKET_ERROR) {
+			success_ = false;
+			LOG_ERROR("Failed to send data: {}", WSAGetLastError());
+			return;
+		}
+		result = recv(socket_, recvBuf_.data(), 150012, 0);
+		if (result == SOCKET_ERROR) {
+			success_ = false;
+			LOG_ERROR("Failed to receive data: {}", WSAGetLastError());
+			return;
+		}
 	}
 };

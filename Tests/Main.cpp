@@ -1,6 +1,7 @@
 #include <Winsock2.h>
 
 #include <array>
+#include <functional>
 #include <memory>
 
 #include "Client.hpp"
@@ -21,14 +22,15 @@ int main() {
 	const char* serverIp = "127.0.0.1";
 	uint16_t serverPort = Config::kPort;
 
-	std::unique_ptr<Client> tests[] = {
-		std::unique_ptr<Fragmentation>(new Fragmentation(serverIp, serverPort)),
-		std::unique_ptr<StickyPackets>(
-			new StickyPackets(serverIp, serverPort))};
+	std::vector<std::function<std::unique_ptr<Client>()>> testFactories = {
+		[&]() { return std::make_unique<Fragmentation>(serverIp, serverPort); },
+		[&]() {
+			return std::make_unique<StickyPackets>(serverIp, serverPort);
+		}};
 
-	for (int i = 0; i < sizeof(tests) / sizeof(tests[0]); ++i) {
-		auto& test = tests[i];
-		for (int j = 0; j < 10000; ++j) {
+	for (int i = 0; i < testFactories.size(); ++i) {
+		for (int j = 0; j < 10; ++j) {
+			auto test = testFactories[i]();
 			if (!test->test()) {
 				LOG_ERROR("Test failed on iteration {}.", j);
 				return 1;

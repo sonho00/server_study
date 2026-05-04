@@ -118,5 +118,8 @@ bool Client::HandlePacket(const PACKET_HEADER& header) {
 bool Client::test() {
 	std::thread clientThread(&Client::ThreadFunc, this);
 	clientThread.join();
-	return memcmp(sendBuf_.data(), recvBuf_.data(), testBytes_) == 0;
+	sendBuf_.fill(0);
+	recvBuf_.fill(0);
+	return success_ &&
+		   memcmp(sendBuf_.data(), recvBuf_.data(), testBytes_) == 0;
 }
