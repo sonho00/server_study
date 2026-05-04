@@ -9,6 +9,7 @@
 *.dll
 
 # IDE (VS Code, Visual Studio)
+.vs/
 .vscode/
 bin/
 obj/
