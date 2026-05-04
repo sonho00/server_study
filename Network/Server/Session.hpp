@@ -2,9 +2,9 @@
 
 #include <WinSock2.h>
 
+#include <array>
 #include <cstddef>
 #include <functional>
-#include <memory>
 #include <mutex>
 
 #include "Network/Common/Protocol.hpp"
@@ -12,16 +12,11 @@
 
 class SessionManager;
 
-struct BufferSizes {
-	size_t readBufferSize_ = 1 << 16;
-	size_t writeBufferSize_ = 1 << 16;
-};
-
 class Session {
    public:
-	Session(const BufferSizes& bufferSizes = BufferSizes())
-		: readOv_(bufferSizes.readBufferSize_),
-		  writeOv_(bufferSizes.writeBufferSize_) {}
+	Session()
+		: readOv_(Config::kMagicBufferSize),
+		  writeOv_(Config::kMagicBufferSize) {}
 
 	bool RegisterRead();
 	bool RegisterWrite();
@@ -32,6 +27,7 @@ class Session {
 	bool HandleIO(OverlappedEx& ovEx, DWORD bytesTransferred);
 
 	void Close();
+	void Reset();
 
 	[[nodiscard]] uint64_t GetHandle() const { return handle_; }
 	void SetHandle(uint64_t handle) { handle_ = handle; }

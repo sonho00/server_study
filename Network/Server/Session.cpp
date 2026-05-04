@@ -190,3 +190,12 @@ void Session::Close() {
 		socket_ = INVALID_SOCKET;
 	}
 }
+
+void Session::Reset() {
+	LOG_DEBUG("[Session:{}] Resetting session", GetHandle());
+	std::lock_guard<std::mutex> lock(mtx_);
+	readOv_.Reset();
+	writeOv_.Reset();
+	socket_ = INVALID_SOCKET;
+	isSending_ = false;
+}

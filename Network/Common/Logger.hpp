@@ -25,7 +25,7 @@
 
 namespace NetUtils {
 enum class LogLevel : std::uint8_t { kDebug, kInfo, kWarn, kError, kFatal };
-constexpr inline LogLevel kLogLevel = LogLevel::kInfo;
+constexpr inline LogLevel kLogLevel = LogLevel::kDebug;
 
 inline std::string_view GetLevelStr(LogLevel level) {
 	switch (level) {
