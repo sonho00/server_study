@@ -19,6 +19,13 @@ bool Session::RegisterRead() {
 
 	readOv_.sessionPtr_ = sessionManager_->GetSession(handle_);
 
+	if (readOv_.wsaBuf_.len == 0) {
+		LOG_ERROR("[Session:{}] Read buffer overflow detected", handle_);
+		Close();
+		return false;
+	}
+	readOv_.sessionPtr_ = sessionManager_->GetSession(handle_);
+
 	DWORD flags = 0;
 	int recvResult = WSARecv(socket_, &readOv_.wsaBuf_, 1, nullptr, &flags,
 							 &readOv_.overlapped_, nullptr);
@@ -63,6 +70,12 @@ bool Session::RegisterWrite() {
 
 bool Session::SendPacket(const PACKET_HEADER& header) {
 	std::lock_guard<std::mutex> lock(mtx_);
+	if (writeOv_.writePos_ - writeOv_.readPos_ + header.size >
+		writeOv_.buffer_.GetSize()) {
+		LOG_ERROR("[Session:{}] Write buffer overflow detected", handle_);
+		Close();
+		return false;
+	}
 
 	memcpy(writeOv_.buffer_.GetBuffer() + writeOv_.writePos_, &header,
 		   header.size);
@@ -81,13 +94,6 @@ bool Session::SendPacket(const PACKET_HEADER& header) {
 }
 
 bool Session::OnRead(DWORD bytesTransferred) {
-	if (readOv_.writePos_ - readOv_.readPos_ + bytesTransferred >
-		readOv_.buffer_.GetSize()) {
-		LOG_ERROR("[Session:{}] Read buffer overflow detected", GetHandle());
-		Close();
-		return false;
-	}
-
 	readOv_.writePos_ += bytesTransferred;
 
 	while (true) {
@@ -142,13 +148,6 @@ bool Session::OnWrite(DWORD bytesTransferred) {
 	// 이 함수가 호출될 때는 is sending_가 true인 상태입니다.
 	std::lock_guard<std::mutex> lock(mtx_);
 	writeOv_.readPos_ += bytesTransferred;
-
-	if (writeOv_.writePos_ - writeOv_.readPos_ + bytesTransferred >
-		writeOv_.buffer_.GetSize()) {
-		LOG_ERROR("[Session:{}] Write buffer overflow detected", GetHandle());
-		Close();
-		return false;
-	}
 
 	if (writeOv_.sessionPtr_.Reset()) {
 		LOG_INFO("[Session:{}] Session released after write completion",
