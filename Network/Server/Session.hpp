@@ -32,11 +32,16 @@ class Session {
 	[[nodiscard]] uint64_t GetHandle() const { return handle_; }
 	void SetHandle(uint64_t handle) { handle_ = handle; }
 
+	void SetSessionManager(SessionManager* manager) {
+		sessionManager_ = manager;
+	}
+
 	OverlappedEx readOv_;
 	OverlappedEx writeOv_;
 	SOCKET socket_ = INVALID_SOCKET;
 
    private:
+	SessionManager* sessionManager_ = nullptr;
 	uint64_t handle_ = 0;
 	std::mutex mtx_;
 	bool isSending_ = false;
