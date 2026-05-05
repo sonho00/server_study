@@ -5,7 +5,6 @@
 #include <memory>
 
 #include "Client.hpp"
-#include "Network/Common/Config.hpp"
 #include "Network/Common/Logger.hpp"
 #include "Network/Common/WSAManager.hpp"
 #include "TestCase/01_Fragmentation.hpp"
@@ -19,14 +18,10 @@ int main() {
 
 	LOG_INFO("Test client started.");
 
-	const char* serverIp = "127.0.0.1";
-	uint16_t serverPort = Config::kPort;
-
 	std::vector<std::function<std::unique_ptr<Client>()>> testFactories = {
-		[&]() { return std::make_unique<Fragmentation>(serverIp, serverPort); },
-		[&]() {
-			return std::make_unique<StickyPackets>(serverIp, serverPort);
-		}};
+		[&]() { return std::make_unique<Fragmentation>(); },
+		[&]() { return std::make_unique<StickyPackets>(); },
+	};
 
 	for (int i = 0; i < testFactories.size(); ++i) {
 		for (int j = 0; j < 10; ++j) {

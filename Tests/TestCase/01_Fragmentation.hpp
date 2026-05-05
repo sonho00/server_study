@@ -10,7 +10,6 @@
 
 class Fragmentation : public Client {
    public:
-	Fragmentation(const char* ip, const uint16_t port) : Client(ip, port) {}
 	void ThreadFunc() override {
 		testBytes_ = 404;
 		auto* packet = reinterpret_cast<C2S_CHAT*>(sendBuf_.data());

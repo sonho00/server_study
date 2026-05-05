@@ -10,7 +10,6 @@
 
 class StickyPackets : public Client {
    public:
-	StickyPackets(const char* ip, const uint16_t port) : Client(ip, port) {}
 	void ThreadFunc() override {
 		reinterpret_cast<PACKET_HEADER*>(sendBuf_.data())->id =
 			static_cast<uint16_t>(C2S_PACKET_ID::kChat);
