@@ -2,6 +2,7 @@
 
 #include <cstdio>
 #include <cstring>
+#include <thread>
 
 #include "Network/Common/Logger.hpp"
 #include "Network/Common/Protocol.hpp"
@@ -36,5 +37,15 @@ class StickyPackets : public Client {
 			LOG_ERROR("Failed to receive data: {}", WSAGetLastError());
 			return;
 		}
+	}
+
+	bool test() override {
+		sendBuf_.fill(0);
+		recvBuf_.fill(0);
+		success_ = true;
+		std::thread clientThread(&StickyPackets::ThreadFunc, this);
+		clientThread.join();
+		return success_ &&
+			   memcmp(sendBuf_.data(), recvBuf_.data(), 150012) == 0;
 	}
 };

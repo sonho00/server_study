@@ -20,8 +20,7 @@ class Client {
 	static bool HandlePacket(const PACKET_HEADER& header);
 
 	virtual void ThreadFunc() = 0;
-
-	bool test();
+	virtual bool test() = 0;
 
 	bool success_ = true;
 	size_t testBytes_ = 0;
