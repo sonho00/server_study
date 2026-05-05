@@ -30,8 +30,8 @@ class StickyPackets : public Client {
 			LOG_ERROR("Failed to send data: {}", WSAGetLastError());
 			return;
 		}
-		result = recv(socket_, recvBuf_.data(), 150012, 0);
-		if (result == SOCKET_ERROR) {
+
+		if (!ReceiveByte(recvBuf_.data(), 150012)) {
 			success_ = false;
 			LOG_ERROR("Failed to receive data: {}", WSAGetLastError());
 			return;

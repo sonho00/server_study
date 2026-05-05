@@ -19,36 +19,36 @@ file(GLOB SERVER_ONLY_SRC "Network/Server/*.cpp")
 file(GLOB CLIENT_ONLY_SRC "Network/Client/*.cpp")
 file(GLOB TEST_SRC "Tests/*.cpp")
 
-add_executable(Server ${SERVER_ONLY_SRC} ${COMMON_SRC})
-add_executable(Client ${CLIENT_ONLY_SRC} ${COMMON_SRC})
-add_executable(Tests ${TEST_SRC} ${COMMON_SRC})
+add_executable(server ${SERVER_ONLY_SRC} ${COMMON_SRC})
+add_executable(client ${CLIENT_ONLY_SRC} ${COMMON_SRC})
+add_executable(tests ${TEST_SRC} ${COMMON_SRC})
 
 if(WIN32)
-    target_link_libraries(Server PRIVATE ws2_32)
-    target_link_libraries(Client PRIVATE ws2_32)
-    target_link_libraries(Tests PRIVATE ws2_32)
+    target_link_libraries(server PRIVATE ws2_32)
+    target_link_libraries(client PRIVATE ws2_32)
+    target_link_libraries(tests PRIVATE ws2_32)
 endif()
 
 # 서버 실행 타겟
 add_custom_target(run-server
-    COMMAND Server
-    DEPENDS Server
+    COMMAND server
+    DEPENDS server
     WORKING_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
     COMMENT "Building and Running Server..."
 )
 
 # 클라이언트 실행 타겟
 add_custom_target(run-client
-    COMMAND Client
-    DEPENDS Client
+    COMMAND client
+    DEPENDS client
     WORKING_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
     COMMENT "Building and Running Client..."
 )
 
 # 테스트 실행 타겟
 add_custom_target(run-test
-    COMMAND Tests
-    DEPENDS Tests
+    COMMAND tests
+    DEPENDS tests
     WORKING_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
     COMMENT "Building and Running Tests..."
 )

@@ -12,8 +12,10 @@ class Client {
 	~Client();
 
 	[[nodiscard]] bool SendPacket(const PACKET_HEADER& header) const;
-	[[nodiscard]] bool ReceiveByte(char* buffer, uint32_t len) const;
-	PACKET_HEADER* ReceivePacket(char* buffer);
+	[[nodiscard]] PACKET_HEADER* ReceivePacket(char* buffer);
+
+	[[nodiscard]] bool SendByte(char* buffer, int len) const;
+	[[nodiscard]] bool ReceiveByte(char* buffer, int len) const;
 
 	static bool HandlePacket(const PACKET_HEADER& header);
 
@@ -21,7 +23,6 @@ class Client {
 	virtual bool test() = 0;
 
 	bool success_ = true;
-	size_t testBytes_ = 0;
 
 	static std::array<char, 1 << 20> sendBuf_;
 	static std::array<char, 1 << 20> recvBuf_;

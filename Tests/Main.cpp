@@ -30,10 +30,6 @@ int main() {
 				LOG_ERROR("Test failed on iteration {}.", j);
 				return 1;
 			}
-			test->success_ = true;
-			test->testBytes_ = 0;
-			memset(test->sendBuf_.data(), 0, test->sendBuf_.size());
-			memset(test->recvBuf_.data(), 0, test->recvBuf_.size());
 		}
 		LOG_INFO("Test {} passed.", i + 1);
 	}

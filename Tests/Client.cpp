@@ -39,12 +39,10 @@ Client::~Client() {
 	}
 }
 
-bool Client::SendPacket(const PACKET_HEADER& header) const {
-	const char* buffer = reinterpret_cast<const char*>(&header);
+bool Client::SendByte(char* buffer, int len) const {
 	int bytesSent = 0;
-	while (bytesSent < header.size) {
-		int result =
-			send(socket_, buffer + bytesSent, header.size - bytesSent, 0);
+	while (bytesSent < len) {
+		int result = send(socket_, buffer + bytesSent, len - bytesSent, 0);
 		if (result == 0) {
 			LOG_INFO("Connection closed by server.");
 			return false;
@@ -58,11 +56,11 @@ bool Client::SendPacket(const PACKET_HEADER& header) const {
 	return true;
 }
 
-bool Client::ReceiveByte(char* buffer, uint32_t len) const {
-	uint32_t bytesReceived = 0;
+bool Client::ReceiveByte(char* buffer, int len) const {
+	int bytesReceived = 0;
 	while (bytesReceived < len) {
-		int result = recv(socket_, buffer + bytesReceived,
-						  static_cast<int>(len - bytesReceived), 0);
+		int result =
+			recv(socket_, buffer + bytesReceived, len - bytesReceived, 0);
 		if (result == 0) {
 			LOG_INFO("Connection closed by server.");
 			return false;
@@ -72,6 +70,14 @@ bool Client::ReceiveByte(char* buffer, uint32_t len) const {
 			return false;
 		}
 		bytesReceived += result;
+	}
+	return true;
+}
+
+bool Client::SendPacket(const PACKET_HEADER& header) const {
+	if (!SendByte((char*)&header, sizeof(header))) {
+		LOG_ERROR("Failed to send packet header.");
+		return false;
 	}
 	return true;
 }
