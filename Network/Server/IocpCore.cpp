@@ -118,9 +118,7 @@ void IocpCore::Dispatch(const IocpResult& iocpResult) {
 			LOG_ERROR("Failed to handle accept");
 		}
 	} else {
-		SharedPoolPtr<Session> objPtr =
-			sessionManager_.GetSession(iocpResult.completionKey_);
-		iocpResult.overlappedEx_->sessionPtr_ = objPtr;
+		SharedPoolPtr<Session> objPtr = iocpResult.overlappedEx_->sessionPtr_;
 
 		if (iocpResult.bytesTransferred_ == 0) {
 			LOG_INFO("[Session:{}] Connection closed by client",
@@ -135,8 +133,6 @@ void IocpCore::Dispatch(const IocpResult& iocpResult) {
 					  objPtr->GetHandle());
 			objPtr->Close();
 		}
-
-		iocpResult.overlappedEx_->sessionPtr_.Reset();
 	}
 }
 

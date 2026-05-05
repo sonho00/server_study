@@ -27,7 +27,7 @@ class IocpCore {
    private:
 	void WorkerThread();
 	void LogIOEvent(const IocpResult& iocpResult);
-	void Dispatch(const IocpResult& iocpResult);
+	static void Dispatch(const IocpResult& iocpResult);
 	bool HandleError(const IocpResult& iocpResult);
 
 	std::vector<std::thread> threads_;

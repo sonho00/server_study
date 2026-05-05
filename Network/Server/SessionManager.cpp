@@ -12,6 +12,7 @@ SharedPoolPtr<Session> SessionManager::CreateSession() {
 		LOG_ERROR("Failed to create session: No available handles");
 		return nullptr;
 	}
+	session->SetSessionManager(this);
 	uint64_t handle = session->GetHandle();
 	auto idx = static_cast<uint32_t>(handle);
 	sessionPtrs_[idx] = session;
