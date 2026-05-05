@@ -12,16 +12,17 @@ class SharedPoolPtr {
 	SharedPoolPtr(SharedPoolPtr&& other) noexcept;
 	SharedPoolPtr(std::nullptr_t = nullptr);
 	SharedPoolPtr& operator=(const SharedPoolPtr& other);
+	SharedPoolPtr& operator=(SharedPoolPtr&& other) noexcept;
 
 	~SharedPoolPtr();
 
-	[[nodiscard]] explicit operator bool() const;
+	[[nodiscard]] bool IsValid() const;
 
 	[[nodiscard]] T* Get() const;
 	[[nodiscard]] T& operator*() const;
 	T* operator->();
 
-	void Reset();
+	bool Reset();
 
    private:
 	ISparsePool<T>* pool_;
@@ -73,20 +74,34 @@ SharedPoolPtr<T>& SharedPoolPtr<T>::operator=(const SharedPoolPtr& other) {
 }
 
 template <typename T>
+SharedPoolPtr<T>& SharedPoolPtr<T>::operator=(SharedPoolPtr&& other) noexcept {
+	if (this != &other) {
+		if (pool_) pool_->ReleaseRef(handle_);
+
+		pool_ = other.pool_;
+		handle_ = other.handle_;
+
+		other.pool_ = nullptr;
+		other.handle_ = 0;
+	}
+	return *this;
+}
+
+template <typename T>
 SharedPoolPtr<T>::~SharedPoolPtr() {
-	if (pool_) {
+	if (pool_ && pool_->IsValid(handle_)) {
 		pool_->ReleaseRef(handle_);
 	}
 }
 
 template <typename T>
-SharedPoolPtr<T>::operator bool() const {
+bool SharedPoolPtr<T>::IsValid() const {
 	return pool_ && pool_->IsValid(handle_);
 }
 
 template <typename T>
 T* SharedPoolPtr<T>::Get() const {
-	return pool_ ? pool_->Get(handle_) : nullptr;
+	return IsValid() ? pool_->Get(handle_) : nullptr;
 }
 
 template <typename T>
@@ -100,10 +115,13 @@ T* SharedPoolPtr<T>::operator->() {
 }
 
 template <typename T>
-void SharedPoolPtr<T>::Reset() {
-	if (pool_) {
-		pool_->ReleaseRef(handle_);
+bool SharedPoolPtr<T>::Reset() {
+	if (pool_ && pool_->IsValid(handle_)) {
+		if (pool_->ReleaseRef(handle_)) {
+			return true;
+		}
+		pool_ = nullptr;
+		handle_ = 0;
 	}
-	pool_ = nullptr;
-	handle_ = 0;
+	return false;
 }
