@@ -66,7 +66,6 @@ SharedPoolPtr<T> SparsePool<T, N, isLazy>::Acquire(Args&&... args) {
 	if constexpr (isLazy) {
 		new (&slot.obj_) T(std::forward<Args>(args)...);
 	} else if constexpr (has_reset<T>) {
-		LOG_DEBUG("Resetting object at handle: {}", handle);
 		slot.obj_.Reset(std::forward<Args>(args)...);
 	}
 	slot.obj_.SetHandle(handle);
@@ -95,9 +94,10 @@ bool SparsePool<T, N, isLazy>::ReleaseRef(uint64_t handle) {
 	auto& slot = reinterpret_cast<Slot&>(pool_[idx * sizeof(Slot)]);
 	if (slot.refCount_.fetch_sub(1, std::memory_order_acq_rel) == 1) {
 		if constexpr (isLazy) slot.obj_.~T();
-		sparseSet_.Push(idx);
+		sparseSet_.Push(handle);
+		return true;
 	}
-	return true;
+	return false;
 }
 template <typename T, size_t N, bool isLazy>
 bool SparsePool<T, N, isLazy>::IsValid(uint64_t handle) const {
@@ -122,6 +122,6 @@ bool SparsePool<T, N, isLazy>::Release(uint64_t handle) {
 		LOG_ERROR("Invalid handle: {}", handle);
 		return false;
 	}
-	sparseSet_.Push(handle);
+	ReleaseRef(handle);
 	return true;
 }

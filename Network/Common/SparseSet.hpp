@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "Logger.hpp"
+#include "Network/Common/Logger.hpp"
 
 template <size_t N>
 class SparseSet {
@@ -55,9 +56,10 @@ uint64_t SparseSet<N>::Pop() {
 		slot = &sparse_[newPerson];
 		slot->where_ = activeCount_;
 		++activeCount_;
+		LOG_DEBUG("Popped new person: {}, activeCount_: {}", newPerson,
+				  activeCount_);
+		slot->generation_ = generation_[newPerson];
 	}
-
-	slot->generation_ = generation_[newPerson];
 
 	return (static_cast<uint64_t>(generation_[newPerson]) << kIndexShift) |
 		   newPerson;
@@ -67,19 +69,22 @@ template <size_t N>
 bool SparseSet<N>::Pop(uint64_t handle) {
 	auto who = static_cast<uint32_t>(handle);
 	auto generation = static_cast<uint32_t>(handle >> kIndexShift);
+	Slot& slot = sparse_[who];
 
-	if (who >= N || sparse_[who].generation_ != generation) {
+	if (who >= N || slot.generation_ != generation) {
 		LOG_ERROR(
-			"Invalid handle: who: {}, generation: {}, "
+			"Invalid handle: handle: {}, who: {}, generation: {}, "
 			"slots_[who].generation_: {}",
-			who, generation, sparse_[who].generation_);
+			handle, who, generation, slot.generation_);
 		return false;
 	}
 
 	std::lock_guard<std::mutex> lock(mutex_);
-	sparse_[who].where_ = activeCount_;
+
+	slot.where_ = activeCount_;
 	dense_[activeCount_] = who;
 	++activeCount_;
+
 	return true;
 }
 
@@ -88,21 +93,23 @@ bool SparseSet<N>::Push(uint64_t handle) {
 	auto who = static_cast<uint32_t>(handle);
 	auto generation = static_cast<uint32_t>(handle >> kIndexShift);
 
-	std::lock_guard<std::mutex> lock(mutex_);
 	if (who >= N || generation_[who] != generation) {
 		LOG_ERROR(
-			"Invalid handle: who: {}, generation: {}, "
+			"Invalid handle: {}, who: {}, generation: {}, "
 			"generation_[who]: {}",
-			who, generation, generation_[who]);
+			handle, who, generation, generation_[who]);
 		return false;
 	}
+
+	std::lock_guard<std::mutex> lock(mutex_);
 
 	--activeCount_;
 	Slot& lastPerson = sparse_[dense_[activeCount_]];
 	lastPerson.where_ = sparse_[who].where_;
+	++lastPerson.generation_;
+
 	std::swap(dense_[lastPerson.where_], dense_[activeCount_]);
 	++generation_[who];
-
 	return true;
 }
 
