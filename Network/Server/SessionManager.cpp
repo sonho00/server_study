@@ -8,12 +8,13 @@
 
 SharedPoolPtr<Session> SessionManager::CreateSession() {
 	auto session = sessionPool_.Acquire();
-	if (!session) {
+	if (!session.IsValid()) {
 		LOG_ERROR("Failed to create session: No available handles");
 		return nullptr;
 	}
 	uint64_t handle = session->GetHandle();
-	sessionPtrs_[handle] = session;
+	auto idx = static_cast<uint32_t>(handle);
+	sessionPtrs_[idx] = session;
 
 	return session;
 }
@@ -27,15 +28,9 @@ bool SessionManager::AddSession(uint64_t handle) {
 }
 
 bool SessionManager::RemoveSession(uint64_t handle) {
-	if (!activeSessions_.Push(handle)) {
-		LOG_ERROR("Failed to remove session with handle: {}", handle);
-		return false;
-	}
-	if (!sessionPool_.Release(handle)) {
-		LOG_ERROR("Failed to return session handle to sessionPool: {}", handle);
-		return false;
-	}
-	sessionPtrs_[handle].Reset();
+	auto idx = static_cast<uint32_t>(handle);
+	activeSessions_.Push(handle);
+	sessionPtrs_[idx].Reset();
 	return true;
 }
 

@@ -79,7 +79,7 @@ bool Listener::PostAccept() {
 	}
 
 	auto session = sessionManager_.CreateSession();
-	if (!session) return false;
+	if (!session.IsValid()) return false;
 
 	session->readOv_.ioType_ = IO_TYPE::kAccept;
 	session->readOv_.wsaBuf_.buf = session->readOv_.buffer_.GetBuffer();
