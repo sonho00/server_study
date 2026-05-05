@@ -2,13 +2,10 @@
 
 #include <ws2tcpip.h>
 
-#include <thread>
-
 #include "Network/Common/Logger.hpp"
 #include "Network/Common/Protocol.hpp"
 
-Client::Client(const char* ipAddr, uint16_t port)
-	: socket_(socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) {
+Client::Client() : socket_(socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) {
 	if (socket_ == INVALID_SOCKET) {
 		LOG_FATAL("Failed to create socket: {}", WSAGetLastError());
 	}
@@ -27,8 +24,8 @@ Client::Client(const char* ipAddr, uint16_t port)
 
 	sockaddr_in serverAddr{};
 	serverAddr.sin_family = AF_INET;
-	InetPton(AF_INET, ipAddr, &serverAddr.sin_addr);
-	serverAddr.sin_port = htons(port);
+	InetPton(AF_INET, kIpAddr_, &serverAddr.sin_addr);
+	serverAddr.sin_port = htons(kPort_);
 	if (connect(socket_, (sockaddr*)&serverAddr, sizeof(serverAddr)) ==
 		SOCKET_ERROR) {
 		closesocket(socket_);
