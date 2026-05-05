@@ -18,6 +18,7 @@ class Listener {
 
 	bool HandleAccept(const OverlappedEx& ovEx);
 	bool PostAccept();
+	bool RegisterAccept(SOCKET hAcceptSocket, SharedPoolPtr<Session> session);
 
    private:
 	OverlappedEx acceptOv_;

@@ -4,6 +4,7 @@
 
 #include "IocpCore.hpp"
 #include "Network/Common/Logger.hpp"
+#include "Network/Common/SharedPoolPtr.hpp"
 #include "OverlappedEx.hpp"
 #include "ServerUtils.hpp"
 #include "SessionManager.hpp"
@@ -59,6 +60,12 @@ bool Listener::HandleAccept(const OverlappedEx& ovEx) {
 		return false;
 	}
 
+	if (!iocpCore_.Register(session.socket_, session.GetHandle())) {
+		LOG_ERROR("Failed to register accept socket with IOCP");
+		session.Close();
+		return false;
+	}
+
 	sessionManager_.AddSession(session.GetHandle());
 
 	if (!session.RegisterRead()) {
@@ -81,17 +88,24 @@ bool Listener::PostAccept() {
 	auto session = sessionManager_.CreateSession();
 	if (!session.IsValid()) return false;
 
+	if (!RegisterAccept(hAcceptSocket, session)) {
+		LOG_ERROR("Failed to post AcceptEx");
+		session->Close();
+		return false;
+	}
+
+	return true;
+}
+
+bool Listener::RegisterAccept(SOCKET hAcceptSocket,
+							  SharedPoolPtr<Session> session) {
 	session->readOv_.ioType_ = IO_TYPE::kAccept;
 	session->readOv_.wsaBuf_.buf = session->readOv_.buffer_.GetBuffer();
 	session->readOv_.wsaBuf_.len =
 		static_cast<ULONG>(session->readOv_.buffer_.GetSize());
 	session->socket_ = hAcceptSocket;
 
-	if (!iocpCore_.Register(hAcceptSocket, session->GetHandle())) {
-		LOG_ERROR("Failed to register accept socket with IOCP");
-		session->Close();
-		return false;
-	}
+	session->readOv_.sessionPtr_ = session;
 
 	DWORD bytesReceived = 0;
 	BOOL result =
