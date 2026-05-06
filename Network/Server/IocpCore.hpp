@@ -26,9 +26,11 @@ class IocpCore {
 
    private:
 	void WorkerThread();
+
+	static void HandleAccept(const IocpResult& iocpResult);
+	void HandleError(const IocpResult& iocpResult);
 	void LogIOEvent(const IocpResult& iocpResult);
-	static void Dispatch(const IocpResult& iocpResult);
-	bool HandleError(const IocpResult& iocpResult);
+	void Dispatch(const IocpResult& iocpResult);
 
 	std::vector<std::thread> threads_;
 	HANDLE hIocp_;

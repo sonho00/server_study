@@ -2,7 +2,6 @@
 #include "IocpCore.hpp"
 
 #include <WinSock2.h>
-#include <ioapiset.h>
 
 #include <thread>
 
@@ -59,109 +58,134 @@ bool IocpCore::Register(SOCKET socket, ULONG_PTR completionKey) const {
 	return true;
 }
 
-bool IocpCore::HandleError(const IocpResult& iocpResult) {
-	if (iocpResult.overlappedEx_ == nullptr) {
-		if (iocpResult.result_ == FALSE) {
-			LOG_INFO("IOCP is shutting down.");
-			return true;
+void IocpCore::HandleAccept(const IocpResult& iocpResult) {
+	if (iocpResult.result_ == FALSE) {
+		DWORD errorCode = GetLastError();
+		switch (errorCode) {
+			case ERROR_OPERATION_ABORTED:
+				LOG_INFO(
+					"Accept operation was aborted, likely due to server "
+					"shutdown.");
+				return;
+
+			default:
+				LOG_ERROR("Accept operation failed with error code: {}",
+						  errorCode);
+				break;
 		}
 
-		LOG_ERROR("GetQueuedCompletionStatus failed: {}", GetLastError());
-		return false;
-	}
-
-	// result = false
-	int error = WSAGetLastError();
-	if (error == WSA_OPERATION_ABORTED) {
-		LOG_INFO("IOCP is shutting down.");
-		return true;
-	}
-
-	if (error == ERROR_NETNAME_DELETED) {
-		LOG_INFO("Client disconnected.");
-		return false;
-	}
-
-	if (iocpResult.overlappedEx_->ioType_ == IO_TYPE::kAccept) {
-		LOG_ERROR("Accept operation failed: {}", error);
+		auto* session =
+			CONTAINING_RECORD(iocpResult.overlappedEx_, Session, readOv_);
+		LOG_DEBUG(
+			"[Listener] Failed to accept connection - Session Handle: "
+			"{}",
+			session->GetHandle());
 	} else {
-		LOG_ERROR("I/O operation failed: {}", error);
-
-		SharedPoolPtr<Session> objPtr =
-			sessionManager_.GetSession(iocpResult.completionKey_);
-		objPtr->Close();
-	}
-	return false;
-}
-
-void IocpCore::LogIOEvent(const IocpResult& iocpResult) {
-	if (iocpResult.overlappedEx_->ioType_ == IO_TYPE::kAccept) {
 		Session* session =
 			CONTAINING_RECORD(iocpResult.overlappedEx_, Session, readOv_);
 		LOG_INFO("[Listener] Accepted new connection - Session Handle: {}",
 				 session->GetHandle());
-	} else {
-		SharedPoolPtr<Session> session =
-			sessionManager_.GetSession(iocpResult.completionKey_);
-		LOG_DEBUG("[Session:{}] IOType: {} BytesTransferred: {}",
-				  session->GetHandle(),
-				  static_cast<int>(iocpResult.overlappedEx_->ioType_),
-				  iocpResult.bytesTransferred_);
-	}
-}
 
-void IocpCore::Dispatch(const IocpResult& iocpResult) {
-	if (iocpResult.overlappedEx_->ioType_ == IO_TYPE::kAccept) {
 		auto* listener = reinterpret_cast<Listener*>(iocpResult.completionKey_);
 		if (!listener->HandleAccept(
 				static_cast<const OverlappedEx&>(*iocpResult.overlappedEx_))) {
 			LOG_ERROR("Failed to handle accept");
+			session->Close();
 		}
-	} else {
-		SharedPoolPtr<Session> objPtr = iocpResult.overlappedEx_->sessionPtr_;
+	}
+}
 
-		if (iocpResult.bytesTransferred_ == 0) {
-			LOG_INFO("[Session:{}] Connection closed by client",
-					 objPtr->GetHandle());
-			objPtr->Close();
-			return;
-		}
+void IocpCore::HandleError(const IocpResult& iocpResult) {
+	SharedPoolPtr<Session> session =
+		sessionManager_.GetSession(iocpResult.completionKey_);
+	DWORD errorCode = GetLastError();
+	switch (errorCode) {
+		case ERROR_SUCCESS:
+		case ERROR_IO_PENDING:
+			LOG_INFO("[Session:{}] Graceful disconnect detected",
+					 session->GetHandle());
+			break;
 
-		if (!objPtr->HandleIO(*iocpResult.overlappedEx_,
-							  iocpResult.bytesTransferred_)) {
-			LOG_ERROR("[Session:{}] Failed to handle I/O operation",
-					  objPtr->GetHandle());
-			objPtr->Close();
-		}
+		case ERROR_NETNAME_DELETED:
+			LOG_INFO("[Session:{}] Abortive disconnect detected",
+					 session->GetHandle());
+			break;
+
+		default:
+			LOG_ERROR(
+				"[Session:{}] I/O operation failed or connection "
+				"closed: "
+				"{}",
+				session->GetHandle(), errorCode);
+			break;
+	}
+	session->Close();
+}
+
+void IocpCore::LogIOEvent(const IocpResult& iocpResult) {
+	SharedPoolPtr<Session> session =
+		sessionManager_.GetSession(iocpResult.completionKey_);
+
+	LOG_DEBUG("[Session:{}] IOType: {} BytesTransferred: {}",
+			  session->GetHandle(),
+			  static_cast<int>(iocpResult.overlappedEx_->ioType_),
+			  iocpResult.bytesTransferred_);
+}
+
+void IocpCore::Dispatch(const IocpResult& iocpResult) {
+	SharedPoolPtr<Session> session =
+		sessionManager_.GetSession(iocpResult.completionKey_);
+
+	LOG_DEBUG("[Session:{}] Dispatching I/O event - IOType: {}",
+			  session->GetHandle(),
+			  static_cast<int>(iocpResult.overlappedEx_->ioType_));
+
+	if (!session->HandleIO(*iocpResult.overlappedEx_,
+						   iocpResult.bytesTransferred_)) {
+		LOG_ERROR("[Session:{}] Failed to handle I/O operation",
+				  session->GetHandle());
+		session->Close();
 	}
 }
 
 void IocpCore::WorkerThread() {
 	while (true) {
-		OVERLAPPED* overlapped = nullptr;
 		DWORD bytesTransferred = 0;
 		ULONG_PTR completionKey = 0;
+		OVERLAPPED* overlapped = nullptr;
 
 		BOOL result = GetQueuedCompletionStatus(
 			hIocp_, &bytesTransferred, &completionKey, &overlapped, INFINITE);
 
-		OverlappedEx* overlappedEx =
-			CONTAINING_RECORD(overlapped, OverlappedEx, overlapped_);
-
-		IocpResult iocpResult{.result_ = result,
-							  .bytesTransferred_ = bytesTransferred,
-							  .completionKey_ = completionKey,
-							  .overlappedEx_ = overlappedEx};
-
-		if (result == FALSE || overlappedEx == nullptr) {
-			if (HandleError(iocpResult)) {
+		if (overlapped == nullptr) {
+			if (result == TRUE) {
+				LOG_INFO("Server is shutting down.");
 				break;
 			}
+			LOG_FATAL("GQCS failed: {}", GetLastError());
+		}
+
+		OverlappedEx* overlappedEx =
+			CONTAINING_RECORD(overlapped, OverlappedEx, overlapped_);
+		IocpResult iocpResult = {.result_ = result,
+								 .bytesTransferred_ = bytesTransferred,
+								 .completionKey_ = completionKey,
+								 .overlappedEx_ = overlappedEx};
+
+		if (overlappedEx->ioType_ == IO_TYPE::kAccept) {
+			HandleAccept(iocpResult);
+			continue;
+		}
+
+		SharedPoolPtr<Session> session =
+			sessionManager_.GetSession(completionKey);
+
+		if (result == 0 || bytesTransferred == 0) {
+			HandleError(iocpResult);
 			continue;
 		}
 
 		LogIOEvent(iocpResult);
-
 		Dispatch(iocpResult);
 	}
 }
