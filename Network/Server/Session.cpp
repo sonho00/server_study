@@ -3,6 +3,7 @@
 #include <WinSock2.h>
 
 #include <cstring>
+#include <mutex>
 
 #include "Network/Common/Logger.hpp"
 #include "Network/Common/Protocol.hpp"
@@ -11,19 +12,17 @@
 #include "SessionManager.hpp"
 
 bool Session::RegisterRead() {
-	readOv_.ioType_ = IO_TYPE::kRecv;
-	readOv_.wsaBuf_.buf = readOv_.buffer_.GetBuffer() + readOv_.writePos_;
 	readOv_.wsaBuf_.len =
 		readOv_.buffer_.GetSize() - readOv_.writePos_ + readOv_.readPos_;
-	ZeroMemory(&readOv_.overlapped_, sizeof(OVERLAPPED));
-
-	readOv_.sessionPtr_ = sessionManager_->GetSession(handle_);
 
 	if (readOv_.wsaBuf_.len == 0) {
 		LOG_ERROR("[Session:{}] Read buffer overflow detected", handle_);
-		Close();
 		return false;
 	}
+
+	readOv_.ioType_ = IO_TYPE::kRecv;
+	readOv_.wsaBuf_.buf = readOv_.buffer_.GetBuffer() + readOv_.writePos_;
+	ZeroMemory(&readOv_.overlapped_, sizeof(OVERLAPPED));
 	readOv_.sessionPtr_ = sessionManager_->GetSession(handle_);
 
 	DWORD flags = 0;
@@ -34,7 +33,6 @@ bool Session::RegisterRead() {
 		int errorCode = WSAGetLastError();
 		if (errorCode != ERROR_IO_PENDING) {
 			LOG_ERROR("[Session:{}] WSARecv failed: {}", handle_, errorCode);
-			Close();
 			return false;
 		}
 	}
@@ -49,7 +47,6 @@ bool Session::RegisterWrite() {
 	writeOv_.wsaBuf_.buf = writeOv_.buffer_.GetBuffer() + writeOv_.readPos_;
 	writeOv_.wsaBuf_.len = writeOv_.writePos_ - writeOv_.readPos_;
 	ZeroMemory(&writeOv_.overlapped_, sizeof(OVERLAPPED));
-
 	writeOv_.sessionPtr_ = sessionManager_->GetSession(handle_);
 
 	DWORD flags = 0;
@@ -60,7 +57,6 @@ bool Session::RegisterWrite() {
 		int errorCode = WSAGetLastError();
 		if (errorCode != ERROR_IO_PENDING) {
 			LOG_ERROR("[Session:{}] WSASend failed: {}", handle_, errorCode);
-			Close();
 			return false;
 		}
 	}
@@ -73,7 +69,6 @@ bool Session::SendPacket(const PACKET_HEADER& header) {
 	if (writeOv_.writePos_ - writeOv_.readPos_ + header.size >
 		writeOv_.buffer_.GetSize()) {
 		LOG_ERROR("[Session:{}] Write buffer overflow detected", handle_);
-		Close();
 		return false;
 	}
 
@@ -106,7 +101,6 @@ bool Session::OnRead(DWORD bytesTransferred) {
 		if (header->size == 0 || header->size > readOv_.buffer_.GetSize()) {
 			LOG_ERROR("[Session:{}] Invalid packet size: {}", handle_,
 					  header->size);
-			Close();
 			return false;
 		}
 
@@ -115,7 +109,6 @@ bool Session::OnRead(DWORD bytesTransferred) {
 		if (!PacketHandler::Execute(*this, *header)) {
 			LOG_ERROR("[Session:{}] Failed to handle packet with ID: {}",
 					  handle_, static_cast<uint16_t>(header->id));
-			Close();
 			return false;
 		}
 
@@ -127,7 +120,6 @@ bool Session::OnRead(DWORD bytesTransferred) {
 
 	if (readOv_.sessionPtr_.Reset()) {
 		LOG_INFO("[Session:{}] Session reset after read completion", handle_);
-		Close();
 		return true;
 	}
 
@@ -186,10 +178,12 @@ bool Session::HandleIO(OverlappedEx& ovEx, DWORD bytesTransferred) {
 }
 
 void Session::Close() {
+	std::lock_guard<std::mutex> lock(mtx_);
 	if (socket_ != INVALID_SOCKET) {
 		LOG_INFO("[Session:{}] Socket closed", handle_);
 		closesocket(socket_);
 		socket_ = INVALID_SOCKET;
+		sessionManager_->ReleaseSession(handle_);
 	}
 }
 

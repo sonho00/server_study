@@ -62,7 +62,6 @@ bool Listener::HandleAccept(const OverlappedEx& ovEx) {
 
 	if (!iocpCore_.Register(session.socket_, session.GetHandle())) {
 		LOG_ERROR("Failed to register accept socket with IOCP");
-		session.Close();
 		return false;
 	}
 
@@ -70,7 +69,6 @@ bool Listener::HandleAccept(const OverlappedEx& ovEx) {
 
 	if (!session.RegisterRead()) {
 		LOG_ERROR("Failed to post initial read");
-		session.Close();
 		return false;
 	}
 
@@ -117,7 +115,6 @@ bool Listener::RegisterAccept(SOCKET hAcceptSocket,
 		int errorCode = WSAGetLastError();
 		if (errorCode != ERROR_IO_PENDING) {
 			LOG_ERROR("AcceptEx failed: {}", errorCode);
-			session->Close();
 			return false;
 		}
 	}
