@@ -36,10 +36,8 @@ bool SessionManager::ReleaseSession(uint64_t handle) {
 }
 
 SharedPoolPtr<Session> SessionManager::GetSession(uint64_t handle) {
-	if (!sessionPool_.IsValid(handle)) {
-		LOG_DEBUG("Invalid session handle: {}", handle);
-		return nullptr;
-	}
+	if (!sessionPool_.IsValid(handle)) return nullptr;
+
 	auto idx = static_cast<uint32_t>(handle);
 	return sessionPtrs_[idx];
 }

@@ -25,9 +25,20 @@ class SparseSet {
 	bool Pop(uint64_t handle);
 	bool Push(uint64_t handle);
 
-	[[nodiscard]] bool IsValid(uint64_t handle) const;
-
 	[[nodiscard]] std::vector<uint64_t> GetActiveIndices();
+
+	[[nodiscard]] bool IsValid(uint64_t handle) const {
+		auto who = static_cast<uint32_t>(handle);
+		auto generation = static_cast<uint32_t>(handle >> kIndexShift);
+		bool valid = who < N && sparse_[who].generation_ == generation;
+		if (!valid) {
+			LOG_ERROR(
+				"Invalid handle: {}, who: {}, generation: {}, "
+				"generation_[who]: {}",
+				handle, who, generation, sparse_[who].generation_);
+		}
+		return valid;
+	}
 
    private:
 	static constexpr uint8_t kIndexShift = 32;
@@ -56,8 +67,6 @@ uint64_t SparseSet<N>::Pop() {
 		slot = &sparse_[newPerson];
 		slot->where_ = activeCount_;
 		++activeCount_;
-		LOG_DEBUG("Popped new person: {}, activeCount_: {}", newPerson,
-				  activeCount_);
 		slot->generation_ = generation_[newPerson];
 	}
 
@@ -67,17 +76,10 @@ uint64_t SparseSet<N>::Pop() {
 
 template <size_t N>
 bool SparseSet<N>::Pop(uint64_t handle) {
-	auto who = static_cast<uint32_t>(handle);
-	auto generation = static_cast<uint32_t>(handle >> kIndexShift);
-	Slot& slot = sparse_[who];
+	if (!IsValid(handle)) return false;
 
-	if (who >= N || slot.generation_ != generation) {
-		LOG_ERROR(
-			"Invalid handle: handle: {}, who: {}, generation: {}, "
-			"slots_[who].generation_: {}",
-			handle, who, generation, slot.generation_);
-		return false;
-	}
+	auto who = static_cast<uint32_t>(handle);
+	Slot& slot = sparse_[who];
 
 	std::lock_guard<std::mutex> lock(mutex_);
 
@@ -90,19 +92,17 @@ bool SparseSet<N>::Pop(uint64_t handle) {
 
 template <size_t N>
 bool SparseSet<N>::Push(uint64_t handle) {
+	if (!IsValid(handle)) return false;
+
 	auto who = static_cast<uint32_t>(handle);
 	auto generation = static_cast<uint32_t>(handle >> kIndexShift);
 
-	if (who >= N || generation_[who] != generation) {
-		LOG_ERROR(
-			"Invalid handle: {}, who: {}, generation: {}, "
-			"generation_[who]: {}",
-			handle, who, generation, generation_[who]);
-		return false;
-	}
+	LOG_DEBUG(
+		"Pushing handle: {}, who: {}, generation: {}, "
+		"generation_[who]: {}",
+		handle, who, generation, generation_[who]);
 
 	std::lock_guard<std::mutex> lock(mutex_);
-
 	--activeCount_;
 	Slot& lastPerson = sparse_[dense_[activeCount_]];
 	lastPerson.where_ = sparse_[who].where_;
@@ -111,13 +111,6 @@ bool SparseSet<N>::Push(uint64_t handle) {
 	std::swap(dense_[lastPerson.where_], dense_[activeCount_]);
 	++generation_[who];
 	return true;
-}
-
-template <size_t N>
-bool SparseSet<N>::IsValid(uint64_t handle) const {
-	auto who = static_cast<uint32_t>(handle);
-	auto generation = static_cast<uint32_t>(handle >> kIndexShift);
-	return who < N && sparse_[who].generation_ == generation;
 }
 
 template <size_t N>
