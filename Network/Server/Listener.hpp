@@ -13,8 +13,7 @@ class SessionManager;
 
 class Listener {
    public:
-	Listener(IocpCore& iocpCore, SessionManager& sessionManager, uint16_t port,
-			 LPFN_ACCEPTEX acceptEx = nullptr);
+	Listener(IocpCore& iocpCore, SessionManager& sessionManager, uint16_t port);
 	~Listener();
 
 	bool HandleAccept(const OverlappedEx& ovEx);
@@ -28,5 +27,4 @@ class Listener {
 	IocpCore& iocpCore_;
 	SessionManager& sessionManager_;
 	uint16_t port_;
-	LPFN_ACCEPTEX acceptEx_;
 };

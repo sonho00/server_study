@@ -4,7 +4,14 @@
 
 #include "Config.hpp"
 
-enum class IO_TYPE : uint8_t { kNone, kRecv, kSend, kAccept, kCnt };
+enum class IO_TYPE : uint8_t {
+	kNone,
+	kRecv,
+	kSend,
+	kAccept,
+	kDisconnect,
+	kCnt
+};
 enum class C2S_PACKET_ID : uint8_t { kNone, kMove, kChat, kCnt };
 enum class S2C_PACKET_ID : uint8_t { kNone, kMove, kChat, kCnt };
 

@@ -6,7 +6,8 @@
 namespace ServerUtils {
 struct NetFuncs {
 	NetFuncs();
-	LPFN_ACCEPTEX acceptEx_;
 };
+extern LPFN_ACCEPTEX AcceptEx;
+extern LPFN_DISCONNECTEX DisconnectEx;
 SOCKET CreateListenSocket(USHORT port);
 }  // namespace ServerUtils

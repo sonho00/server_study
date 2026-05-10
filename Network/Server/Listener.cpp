@@ -12,11 +12,8 @@
 #include "SessionManager.hpp"
 
 Listener::Listener(IocpCore& iocpCore, SessionManager& sessionManager,
-				   uint16_t port, LPFN_ACCEPTEX acceptEx)
-	: iocpCore_(iocpCore),
-	  sessionManager_(sessionManager),
-	  port_(port),
-	  acceptEx_(acceptEx) {
+				   uint16_t port)
+	: iocpCore_(iocpCore), sessionManager_(sessionManager), port_(port) {
 	socket_ = ServerUtils::CreateListenSocket(port_);
 	if (socket_ == INVALID_SOCKET) {
 		LOG_FATAL("Failed to create listen socket");
@@ -95,6 +92,7 @@ bool Listener::PostAccept() {
 	return true;
 }
 
+// NOLINTNEXTLINE readability-make-member-function-const
 bool Listener::RegisterAccept(SOCKET hAcceptSocket,
 							  SharedPoolPtr<Session>& session) {
 	session->readOv_.ioType_ = IO_TYPE::kAccept;
@@ -102,14 +100,13 @@ bool Listener::RegisterAccept(SOCKET hAcceptSocket,
 	session->readOv_.wsaBuf_.len =
 		static_cast<ULONG>(session->readOv_.buffer_.GetSize());
 	session->socket_ = hAcceptSocket;
-
 	session->readOv_.sessionPtr_ = session;
 
 	DWORD bytesReceived = 0;
-	BOOL result =
-		acceptEx_(socket_, hAcceptSocket, session->readOv_.buffer_.GetBuffer(),
-				  0, Config::kAcceptAddrSize, Config::kAcceptAddrSize,
-				  &bytesReceived, &session->readOv_.overlapped_);
+	BOOL result = ServerUtils::AcceptEx(
+		socket_, hAcceptSocket, session->readOv_.buffer_.GetBuffer(), 0,
+		Config::kAcceptAddrSize, Config::kAcceptAddrSize, &bytesReceived,
+		&session->readOv_.overlapped_);
 
 	if (result == 0) {
 		int errorCode = WSAGetLastError();

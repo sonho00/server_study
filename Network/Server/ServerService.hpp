@@ -6,15 +6,14 @@
 #include "Listener.hpp"
 #include "Network/Common/Logger.hpp"
 #include "Network/Common/WSAManager.hpp"
-#include "Network/Server/SessionManager.hpp"
 #include "ServerUtils.hpp"
+#include "SessionManager.hpp"
 
 class ServerService {
    public:
 	ServerService()
 		: iocpCore_(sessionManager_),
-		  listener_(iocpCore_, sessionManager_, Config::kPort,
-					netFuncs_.acceptEx_) {}
+		  listener_(iocpCore_, sessionManager_, Config::kPort) {}
 
 	bool Start() {
 		size_t numThreads = std::thread::hardware_concurrency();
