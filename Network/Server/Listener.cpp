@@ -85,7 +85,7 @@ bool Listener::PostAccept() {
 
 	if (!RegisterAccept(hAcceptSocket, session)) {
 		LOG_ERROR("Failed to post AcceptEx");
-		session->Close();
+		session->Disconnect();
 		return false;
 	}
 

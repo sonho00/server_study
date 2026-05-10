@@ -90,7 +90,7 @@ void IocpCore::HandleAccept(const IocpResult& iocpResult) {
 				static_cast<const OverlappedEx&>(*iocpResult.overlappedEx_))) {
 			LOG_ERROR("[Session:{}] Failed to handle accept",
 					  session->GetHandle());
-			session->Close();
+			session->Disconnect();
 		}
 
 		LOG_INFO("[Session:{}] Accepted new connection", session->GetHandle());
@@ -102,25 +102,36 @@ void IocpCore::HandleError(const IocpResult& iocpResult) {
 		sessionManager_.GetSession(iocpResult.completionKey_);
 	DWORD errorCode = GetLastError();
 	switch (errorCode) {
+		case WSAENOTCONN:
+			if (iocpResult.overlappedEx_->ioType_ == IO_TYPE::kDisconnect) {
+				LOG_ERROR(
+					"[Session:{}][Error:{}] DisconnectEx failed - client "
+					"already disconnected",
+					session->GetHandle(), errorCode);
+				session->Reset();
+				return;
+			}
 		case ERROR_SUCCESS:
 		case ERROR_IO_PENDING:
 			LOG_INFO("[Session:{}][Error:{}] Graceful disconnect detected",
 					 session->GetHandle(), errorCode);
+			session->Disconnect();
 			break;
 
 		case ERROR_NETNAME_DELETED:
 			LOG_INFO("[Session:{}][Error:{}] Abortive disconnect detected",
 					 session->GetHandle(), errorCode);
+			session->Disconnect();
 			break;
 
 		default:
 			LOG_ERROR(
 				"[Session:{}][Error:{}] I/O operation failed or connection "
-				"closed unexpectedly",
+				"closed unexpectedly ",
 				session->GetHandle(), errorCode);
+			session.Reset();
 			break;
 	}
-	session->Close();
 }
 
 void IocpCore::LogIOEvent(const IocpResult& iocpResult) {
@@ -145,7 +156,7 @@ void IocpCore::Dispatch(const IocpResult& iocpResult) {
 						   iocpResult.bytesTransferred_)) {
 		LOG_ERROR("[Session:{}] Failed to handle I/O operation",
 				  session->GetHandle());
-		session->Close();
+		session->Disconnect();
 	}
 }
 

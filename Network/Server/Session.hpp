@@ -29,13 +29,15 @@ class Session {
 	bool OnWrite(DWORD bytesTransferred);
 	bool HandleIO(OverlappedEx& ovEx, DWORD bytesTransferred);
 
-	void Close();
+	void Disconnect();
 	void Reset();
+	void ReCreate();
 
 	[[nodiscard]] uint64_t GetHandle() const { return handle_; }
 
 	OverlappedEx readOv_;
 	OverlappedEx writeOv_;
+	OverlappedEx disconnectOv_;
 	SOCKET socket_ = INVALID_SOCKET;
 
    private:

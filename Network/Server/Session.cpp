@@ -9,6 +9,7 @@
 #include "Network/Common/Protocol.hpp"
 #include "OverlappedEx.hpp"
 #include "PacketHandler.hpp"
+#include "ServerUtils.hpp"
 #include "SessionManager.hpp"
 
 bool Session::RegisterRead() {
@@ -179,13 +180,24 @@ bool Session::HandleIO(OverlappedEx& ovEx, DWORD bytesTransferred) {
 	}
 }
 
-void Session::Close() {
+void Session::Disconnect() {
 	std::lock_guard<std::mutex> lock(mtx_);
-	if (socket_ != INVALID_SOCKET) {
-		LOG_INFO("[Session:{}] Socket closed", handle_);
-		closesocket(socket_);
-		socket_ = INVALID_SOCKET;
-		sessionManager_->DisconnectSession(handle_);
+	if (socket_ == INVALID_SOCKET) {
+		return;
+	}
+
+	disconnectOv_.ioType_ = IO_TYPE::kDisconnect;
+	ZeroMemory(&disconnectOv_.overlapped_, sizeof(OVERLAPPED));
+	disconnectOv_.sessionPtr_ = sessionManager_->GetSession(handle_);
+
+	int result = ServerUtils::DisconnectEx(socket_, &disconnectOv_.overlapped_,
+										   TF_REUSE_SOCKET, 0);
+	if (result == SOCKET_ERROR) {
+		int errorCode = WSAGetLastError();
+		if (errorCode != ERROR_IO_PENDING) {
+			LOG_ERROR("[Session:{}][Error:{}] DisconnectEx failed", handle_,
+					  errorCode);
+		}
 	}
 }
 
