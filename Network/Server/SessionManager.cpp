@@ -7,32 +7,26 @@
 #include "Network/Common/SparsePool.hpp"
 
 SharedPoolPtr<Session> SessionManager::CreateSession() {
-	SharedPoolPtr<Session> session = sessionPool_.Acquire();
-	if (!session.IsValid()) {
+	SharedPoolPtr<Session> sessionPtr =
+		sessionPool_.Acquire(static_cast<size_t>(SessionState::kPending));
+	if (!sessionPtr.IsValid()) {
 		LOG_ERROR("Failed to create session: No available handles");
 		return nullptr;
 	}
-	session->SetSessionManager(this);
-	uint64_t handle = session->GetHandle();
-	auto idx = static_cast<uint32_t>(handle);
-	sessionPtrs_[idx] = session;
-
-	return session;
+	sessionPtr->sessionManager_ = this;
+	sessionPtr->handle_ = sessionPtr.GetHandle();
+	auto idx = static_cast<uint32_t>(sessionPtr->handle_);
+	sessionPtrs_[idx] = std::move(sessionPtr);
+	return sessionPtrs_[idx];
 }
 
-bool SessionManager::AddSession(uint64_t handle) {
-	if (!activeSessions_.Pop(handle)) {
-		LOG_ERROR("Failed to add session with handle: {}", handle);
-		return false;
-	}
-	return true;
+bool SessionManager::ConnectSession(uint64_t handle) {
+	return sessionPool_.MoveToState(handle,
+									static_cast<size_t>(SessionState::kActive));
 }
 
-bool SessionManager::ReleaseSession(uint64_t handle) {
-	auto idx = static_cast<uint32_t>(handle);
-	activeSessions_.Push(handle);
-	sessionPtrs_[idx].Reset();
-	return true;
+bool SessionManager::DisconnectSession(uint64_t handle) {
+	return sessionPool_.Release(handle);
 }
 
 SharedPoolPtr<Session> SessionManager::GetSession(uint64_t handle) {

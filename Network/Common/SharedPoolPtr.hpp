@@ -26,6 +26,8 @@ class SharedPoolPtr {
 
 	bool Reset();
 
+	[[nodiscard]] uint64_t GetHandle() const { return handle_; }
+
    private:
 	ISparsePool<T>* pool_;
 	uint64_t handle_;

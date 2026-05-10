@@ -2,6 +2,8 @@
 
 #include <WinSock2.h>
 
+#include <cstdint>
+
 #include "IocpCore.hpp"
 #include "Network/Common/Logger.hpp"
 #include "Network/Common/SharedPoolPtr.hpp"
@@ -64,8 +66,6 @@ bool Listener::HandleAccept(const OverlappedEx& ovEx) {
 		LOG_ERROR("Failed to register accept socket with IOCP");
 		return false;
 	}
-
-	sessionManager_.AddSession(session.GetHandle());
 
 	if (!session.RegisterRead()) {
 		LOG_ERROR("Failed to post initial read");

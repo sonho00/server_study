@@ -5,13 +5,13 @@
 #include "ISparsePool.hpp"
 #include "Logger.hpp"
 #include "SharedPoolPtr.hpp"
-#include "SparseSet.hpp"
+#include "SparseSetV2.hpp"
 
 template <typename T>
 concept has_reset = requires(T obj) { obj.Reset(); };
 
-template <typename T, size_t N, bool isLazy = false>
-class SparsePool : public ISparsePool<T> {
+template <typename T, size_t N, size_t StateCount = 2, bool isLazy = false>
+class SparsePool : public ISparsePool<T>, public SparseSetV2<N, StateCount> {
    public:
 	using Slot = typename ISparsePool<T>::Slot;
 
@@ -19,7 +19,7 @@ class SparsePool : public ISparsePool<T> {
 	~SparsePool();
 
 	template <typename... Args>
-	SharedPoolPtr<T> Acquire(Args&&... args);
+	SharedPoolPtr<T> Acquire(size_t state = 1, Args&&... args);
 	bool Release(uint64_t handle) override;
 
 	bool AddRef(uint64_t handle) override;
@@ -30,11 +30,10 @@ class SparsePool : public ISparsePool<T> {
 
    private:
 	alignas(Slot) std::array<std::byte, sizeof(Slot) * N> pool_{};
-	SparseSet<N> sparseSet_;
 };
 
-template <typename T, size_t N, bool isLazy>
-SparsePool<T, N, isLazy>::SparsePool() {
+template <typename T, size_t N, size_t StateCount, bool isLazy>
+SparsePool<T, N, StateCount, isLazy>::SparsePool() {
 	if constexpr (!isLazy) {
 		for (size_t i = 0; i < N; ++i) {
 			new (&pool_[i * sizeof(Slot)]) Slot();
@@ -42,8 +41,8 @@ SparsePool<T, N, isLazy>::SparsePool() {
 	}
 }
 
-template <typename T, size_t N, bool isLazy>
-SparsePool<T, N, isLazy>::~SparsePool() {
+template <typename T, size_t N, size_t StateCount, bool isLazy>
+SparsePool<T, N, StateCount, isLazy>::~SparsePool() {
 	if constexpr (!isLazy) {
 		for (size_t i = 0; i < N; ++i) {
 			auto& slot = reinterpret_cast<Slot&>(pool_[i * sizeof(Slot)]);
@@ -52,15 +51,16 @@ SparsePool<T, N, isLazy>::~SparsePool() {
 	}
 }
 
-template <typename T, size_t N, bool isLazy>
+template <typename T, size_t N, size_t StateCount, bool isLazy>
 template <typename... Args>
-SharedPoolPtr<T> SparsePool<T, N, isLazy>::Acquire(Args&&... args) {
-	uint64_t handle = sparseSet_.Pop();
+SharedPoolPtr<T> SparsePool<T, N, StateCount, isLazy>::Acquire(size_t state,
+															   Args&&... args) {
+	uint64_t handle = SparseSetV2<N, StateCount>::Pop(state);
 	if (!IsValid(handle)) {
 		return nullptr;
 	}
-	auto idx = static_cast<uint32_t>(handle);
 
+	auto idx = static_cast<uint32_t>(handle);
 	auto& slot = reinterpret_cast<Slot&>(pool_[idx * sizeof(Slot)]);
 
 	if constexpr (isLazy) {
@@ -68,12 +68,15 @@ SharedPoolPtr<T> SparsePool<T, N, isLazy>::Acquire(Args&&... args) {
 	} else if constexpr (has_reset<T>) {
 		slot.obj_.Reset(std::forward<Args>(args)...);
 	}
-	slot.obj_.SetHandle(handle);
+
+	slot.handle_ = handle;
+	SparseSetV2<N, StateCount>::MoveToState(handle, state);
+
 	return SharedPoolPtr<T>(this, handle);
 }
 
-template <typename T, size_t N, bool isLazy>
-bool SparsePool<T, N, isLazy>::AddRef(uint64_t handle) {
+template <typename T, size_t N, size_t StateCount, bool isLazy>
+bool SparsePool<T, N, StateCount, isLazy>::AddRef(uint64_t handle) {
 	if (!IsValid(handle)) {
 		LOG_ERROR("Invalid handle: {}", handle);
 		return false;
@@ -84,8 +87,8 @@ bool SparsePool<T, N, isLazy>::AddRef(uint64_t handle) {
 	return true;
 }
 
-template <typename T, size_t N, bool isLazy>
-bool SparsePool<T, N, isLazy>::ReleaseRef(uint64_t handle) {
+template <typename T, size_t N, size_t StateCount, bool isLazy>
+bool SparsePool<T, N, StateCount, isLazy>::ReleaseRef(uint64_t handle) {
 	if (!IsValid(handle)) {
 		LOG_ERROR("Invalid handle: {}", handle);
 		return false;
@@ -94,18 +97,19 @@ bool SparsePool<T, N, isLazy>::ReleaseRef(uint64_t handle) {
 	auto& slot = reinterpret_cast<Slot&>(pool_[idx * sizeof(Slot)]);
 	if (slot.refCount_.fetch_sub(1, std::memory_order_acq_rel) == 1) {
 		if constexpr (isLazy) slot.obj_.~T();
-		sparseSet_.Push(handle);
+		SparseSetV2<N, StateCount>::Push(handle);
 		return true;
 	}
 	return false;
 }
-template <typename T, size_t N, bool isLazy>
-bool SparsePool<T, N, isLazy>::IsValid(uint64_t handle) const {
-	return sparseSet_.IsValid(handle);
+
+template <typename T, size_t N, size_t StateCount, bool isLazy>
+bool SparsePool<T, N, StateCount, isLazy>::IsValid(uint64_t handle) const {
+	return SparseSetV2<N, StateCount>::IsValid(handle);
 }
 
-template <typename T, size_t N, bool isLazy>
-T* SparsePool<T, N, isLazy>::Get(uint64_t handle) {
+template <typename T, size_t N, size_t StateCount, bool isLazy>
+T* SparsePool<T, N, StateCount, isLazy>::Get(uint64_t handle) {
 	if (!IsValid(handle)) {
 		LOG_ERROR("Invalid handle: {}", handle);
 		return nullptr;
@@ -116,8 +120,8 @@ T* SparsePool<T, N, isLazy>::Get(uint64_t handle) {
 	return &slot.obj_;
 }
 
-template <typename T, size_t N, bool isLazy>
-bool SparsePool<T, N, isLazy>::Release(uint64_t handle) {
+template <typename T, size_t N, size_t StateCount, bool isLazy>
+bool SparsePool<T, N, StateCount, isLazy>::Release(uint64_t handle) {
 	if (!IsValid(handle)) {
 		LOG_ERROR("Invalid handle: {}", handle);
 		return false;

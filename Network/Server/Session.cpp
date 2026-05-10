@@ -183,7 +183,7 @@ void Session::Close() {
 		LOG_INFO("[Session:{}] Socket closed", handle_);
 		closesocket(socket_);
 		socket_ = INVALID_SOCKET;
-		sessionManager_->ReleaseSession(handle_);
+		sessionManager_->DisconnectSession(handle_);
 	}
 }
 

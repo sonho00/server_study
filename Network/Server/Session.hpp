@@ -8,11 +8,14 @@
 #include <mutex>
 
 #include "Network/Common/Protocol.hpp"
+#include "Network/Common/SparseSet.hpp"
 #include "OverlappedEx.hpp"
 
 class SessionManager;
 
 class Session {
+	friend class SessionManager;
+
    public:
 	Session()
 		: readOv_(Config::kMagicBufferSize),
@@ -30,11 +33,6 @@ class Session {
 	void Reset();
 
 	[[nodiscard]] uint64_t GetHandle() const { return handle_; }
-	void SetHandle(uint64_t handle) { handle_ = handle; }
-
-	void SetSessionManager(SessionManager* manager) {
-		sessionManager_ = manager;
-	}
 
 	OverlappedEx readOv_;
 	OverlappedEx writeOv_;
@@ -42,7 +40,7 @@ class Session {
 
    private:
 	SessionManager* sessionManager_ = nullptr;
-	uint64_t handle_ = 0;
+	uint64_t handle_ = SparseSet<Config::kPoolSize>::kInvalidHandle;
 	std::mutex mtx_;
 	bool isSending_ = false;
 
