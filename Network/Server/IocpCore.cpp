@@ -15,7 +15,7 @@ IocpCore::IocpCore(SessionManager& sessionManager)
 	: sessionManager_(sessionManager) {
 	hIocp_ = CreateIoCompletionPort(INVALID_HANDLE_VALUE, nullptr, 0, 0);
 	if (hIocp_ == nullptr) {
-		LOG_FATAL("Failed to create IOCP: {}", GetLastError());
+		LOG_FATAL("[Error:{}] Failed to create IOCP", GetLastError());
 	}
 }
 
@@ -52,7 +52,8 @@ bool IocpCore::Start(size_t threadCount) {
 bool IocpCore::Register(SOCKET socket, ULONG_PTR completionKey) const {
 	if (CreateIoCompletionPort(reinterpret_cast<HANDLE>(socket), hIocp_,
 							   completionKey, 0) == nullptr) {
-		LOG_ERROR("Failed to register socket with IOCP: {}", GetLastError());
+		LOG_ERROR("[Error:{}] Failed to register socket with IOCP",
+				  GetLastError());
 		return false;
 	}
 	return true;
@@ -64,34 +65,35 @@ void IocpCore::HandleAccept(const IocpResult& iocpResult) {
 		switch (errorCode) {
 			case ERROR_OPERATION_ABORTED:
 				LOG_INFO(
-					"Accept operation was aborted, likely due to server "
-					"shutdown.");
+					"[Session:{}] Accept operation was aborted, likely "
+					"due to server shutdown.",
+					static_cast<uint64_t>(iocpResult.completionKey_));
 				return;
 
 			default:
-				LOG_ERROR("Accept operation failed with error code: {}",
+				LOG_ERROR("[Session:{}][Error:{}] Failed to accept connection",
+						  static_cast<uint64_t>(iocpResult.completionKey_),
 						  errorCode);
 				break;
 		}
 
 		auto* session =
 			CONTAINING_RECORD(iocpResult.overlappedEx_, Session, readOv_);
-		LOG_DEBUG(
-			"[Listener] Failed to accept connection - Session Handle: "
-			"{}",
-			session->GetHandle());
+		LOG_ERROR("[Session:{}] Failed to accept connection",
+				  session->GetHandle());
 	} else {
 		Session* session =
 			CONTAINING_RECORD(iocpResult.overlappedEx_, Session, readOv_);
-		LOG_INFO("[Listener] Accepted new connection - Session Handle: {}",
-				 session->GetHandle());
 
 		auto* listener = reinterpret_cast<Listener*>(iocpResult.completionKey_);
 		if (!listener->HandleAccept(
 				static_cast<const OverlappedEx&>(*iocpResult.overlappedEx_))) {
-			LOG_ERROR("Failed to handle accept");
+			LOG_ERROR("[Session:{}] Failed to handle accept",
+					  session->GetHandle());
 			session->Close();
 		}
+
+		LOG_INFO("[Session:{}] Accepted new connection", session->GetHandle());
 	}
 }
 
@@ -102,20 +104,19 @@ void IocpCore::HandleError(const IocpResult& iocpResult) {
 	switch (errorCode) {
 		case ERROR_SUCCESS:
 		case ERROR_IO_PENDING:
-			LOG_INFO("[Session:{}] Graceful disconnect detected",
-					 session->GetHandle());
+			LOG_INFO("[Session:{}][Error:{}] Graceful disconnect detected",
+					 session->GetHandle(), errorCode);
 			break;
 
 		case ERROR_NETNAME_DELETED:
-			LOG_INFO("[Session:{}] Abortive disconnect detected",
-					 session->GetHandle());
+			LOG_INFO("[Session:{}][Error:{}] Abortive disconnect detected",
+					 session->GetHandle(), errorCode);
 			break;
 
 		default:
 			LOG_ERROR(
-				"[Session:{}] I/O operation failed or connection "
-				"closed: "
-				"{}",
+				"[Session:{}][Error:{}] I/O operation failed or connection "
+				"closed unexpectedly",
 				session->GetHandle(), errorCode);
 			break;
 	}
@@ -162,7 +163,7 @@ void IocpCore::WorkerThread() {
 				LOG_INFO("Server is shutting down.");
 				break;
 			}
-			LOG_FATAL("GQCS failed: {}", GetLastError());
+			LOG_FATAL("[Error:{}] GQCS failed", GetLastError());
 		}
 
 		OverlappedEx* overlappedEx =

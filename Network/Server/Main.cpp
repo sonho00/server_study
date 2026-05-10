@@ -11,5 +11,8 @@ int main() {
 	std::cin.get();
 	LOG_INFO("Server is shutting down...");
 
+	std::cout.flush();
+	std::cerr.flush();
+
 	return 0;
 }

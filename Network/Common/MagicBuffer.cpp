@@ -16,7 +16,7 @@ MagicBuffer::MagicBuffer(size_t size) : size_(size) {
 	hMap_ = CreateFileMapping(INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE, 0,
 							  static_cast<DWORD>(size_), nullptr);
 	if (hMap_ == nullptr) {
-		LOG_FATAL("Failed to create file mapping: {}", GetLastError());
+		LOG_FATAL("[Error:{}] Failed to create file mapping", GetLastError());
 	}
 
 	// 2. 연속된 가상 주소 공간을 2배 크기로 예약
@@ -24,7 +24,7 @@ MagicBuffer::MagicBuffer(size_t size) : size_(size) {
 		VirtualAlloc(nullptr, size_ * 2, MEM_RESERVE, PAGE_NOACCESS));
 	if (ptr == nullptr) {
 		CloseHandle(hMap_);
-		LOG_FATAL("Failed to reserve virtual address space: {}",
+		LOG_FATAL("[Error:{}] Failed to reserve virtual address space",
 				  GetLastError());
 	}
 
@@ -35,14 +35,14 @@ MagicBuffer::MagicBuffer(size_t size) : size_(size) {
 	// 3. 예약된 주소 공간의 앞부분(0 ~ size)에 물리 메모리 매핑
 	if (MapViewOfFileEx(hMap_, FILE_MAP_ALL_ACCESS, 0, 0, size_, buffer_) ==
 		nullptr) {
-		LOG_FATAL("Failed to map view of file to first half: {}",
+		LOG_FATAL("[Error:{}] Failed to map view of file to first half",
 				  GetLastError());
 	}
 
 	// 4. 예약된 주소 공간의 뒷부분(size ~ 2*size)에 동일한 물리 메모리 매핑
 	if (MapViewOfFileEx(hMap_, FILE_MAP_ALL_ACCESS, 0, 0, size_,
 						buffer_ + size_) == nullptr) {
-		LOG_FATAL("Failed to map view of file to second half: {}",
+		LOG_FATAL("[Error:{}] Failed to map view of file to second half",
 				  GetLastError());
 	}
 }

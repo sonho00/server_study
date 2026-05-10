@@ -10,7 +10,8 @@ NetFuncs::NetFuncs() : acceptEx_(nullptr) {
 								   0, WSA_FLAG_OVERLAPPED);
 
 	if (dummySocket == INVALID_SOCKET) {
-		LOG_FATAL("Failed to create dummy socket: {}", WSAGetLastError());
+		LOG_FATAL("[Error:{}] Failed to create dummy socket",
+				  WSAGetLastError());
 	}
 
 	GUID guidAcceptEx = WSAID_ACCEPTEX;
@@ -24,7 +25,7 @@ NetFuncs::NetFuncs() : acceptEx_(nullptr) {
 	closesocket(dummySocket);
 
 	if (result == SOCKET_ERROR) {
-		LOG_FATAL("WSAIoctl failed to get AcceptEx pointer: {}",
+		LOG_FATAL("[Error:{}] WSAIoctl failed to get AcceptEx pointer",
 				  WSAGetLastError());
 	}
 }
@@ -33,7 +34,7 @@ SOCKET CreateListenSocket(USHORT port) {
 	SOCKET listenSocket = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, nullptr,
 									0, WSA_FLAG_OVERLAPPED);
 	if (listenSocket == INVALID_SOCKET) {
-		LOG_FATAL("WSASocket failed: {}", WSAGetLastError());
+		LOG_FATAL("[Error:{}] WSASocket failed", WSAGetLastError());
 	}
 
 	sockaddr_in serverAddr{};
@@ -43,11 +44,11 @@ SOCKET CreateListenSocket(USHORT port) {
 
 	if (bind(listenSocket, reinterpret_cast<sockaddr*>(&serverAddr),
 			 sizeof(serverAddr)) == SOCKET_ERROR) {
-		LOG_FATAL("bind failed: {}", WSAGetLastError());
+		LOG_FATAL("[Error:{}] bind failed", WSAGetLastError());
 	}
 
 	if (listen(listenSocket, SOMAXCONN) == SOCKET_ERROR) {
-		LOG_FATAL("listen failed: {}", WSAGetLastError());
+		LOG_FATAL("[Error:{}] listen failed", WSAGetLastError());
 	}
 
 	return listenSocket;
