@@ -7,7 +7,7 @@
 
 #include "Listener.hpp"
 #include "Network/Common/Logger.hpp"
-#include "Network/Common/SharedPoolPtr.hpp"
+#include "Network/Common/Pool/SharedPoolPtr.hpp"
 #include "Session.hpp"
 #include "SessionManager.hpp"
 

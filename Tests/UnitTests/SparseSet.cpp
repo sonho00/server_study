@@ -1,7 +1,6 @@
+#include "Network/Common/Pool/SparseSet.hpp"
+
 #include <gtest/gtest.h>
-
-#include "Network/Common/SparseSet.hpp"
-
 
 TEST(DataStructureTest, SparseSet) {
 	SparseSet<10, 3> set;

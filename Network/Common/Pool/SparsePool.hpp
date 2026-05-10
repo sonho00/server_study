@@ -3,7 +3,7 @@
 #include <atomic>
 
 #include "ISparsePool.hpp"
-#include "Logger.hpp"
+#include "Network/Common/Logger.hpp"
 #include "ObjectPool.hpp"
 #include "SharedPoolPtr.hpp"
 #include "SparseSet.hpp"

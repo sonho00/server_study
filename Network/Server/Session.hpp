@@ -7,8 +7,8 @@
 #include <functional>
 #include <mutex>
 
+#include "Network/Common/Pool/SparseSet.hpp"
 #include "Network/Common/Protocol.hpp"
-#include "Network/Common/SparseSet.hpp"
 #include "OverlappedEx.hpp"
 
 class SessionManager;

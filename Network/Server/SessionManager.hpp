@@ -4,8 +4,8 @@
 #include <cstdint>
 
 #include "Network/Common/Config.hpp"
-#include "Network/Common/SharedPoolPtr.hpp"
-#include "Network/Common/SparsePool.hpp"
+#include "Network/Common/Pool/SharedPoolPtr.hpp"
+#include "Network/Common/Pool/SparsePool.hpp"
 #include "Session.hpp"
 
 enum class SessionState : uint8_t { kIdle = 0, kPending = 1, kActive = 2 };

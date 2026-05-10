@@ -6,7 +6,7 @@
 
 #include "IocpCore.hpp"
 #include "Network/Common/Logger.hpp"
-#include "Network/Common/SharedPoolPtr.hpp"
+#include "Network/Common/Pool/SharedPoolPtr.hpp"
 #include "OverlappedEx.hpp"
 #include "ServerUtils.hpp"
 #include "SessionManager.hpp"

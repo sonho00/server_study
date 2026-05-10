@@ -4,8 +4,8 @@
 #include <minwinbase.h>
 
 #include "Network/Common/MagicBuffer.hpp"
+#include "Network/Common/Pool/SharedPoolPtr.hpp"
 #include "Network/Common/Protocol.hpp"
-#include "Network/Common/SharedPoolPtr.hpp"
 
 class Session;
 

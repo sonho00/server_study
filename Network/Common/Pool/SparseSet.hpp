@@ -7,7 +7,7 @@
 #include <numeric>
 #include <vector>
 
-#include "Logger.hpp"
+#include "Network/Common/Logger.hpp"
 
 template <size_t N, size_t stateCount = 2>
 class SparseSet {
@@ -108,7 +108,7 @@ bool SparseSet<N, stateCount>::MoveToState(uint64_t handle, size_t newState) {
 template <size_t N, size_t stateCount>
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 bool SparseSet<N, stateCount>::MoveToStateInternal(uint64_t handle,
-													 size_t newState) {
+												   size_t newState) {
 	auto who = static_cast<uint32_t>(handle);
 	while (sparse_[who].state_ < newState) {
 		if (!IncrementStateInternal(handle)) return false;

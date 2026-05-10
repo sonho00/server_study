@@ -5,7 +5,7 @@
 
 #include <cstdint>
 
-#include "Network/Common/SharedPoolPtr.hpp"
+#include "Network/Common/Pool/SharedPoolPtr.hpp"
 #include "OverlappedEx.hpp"
 
 class IocpCore;

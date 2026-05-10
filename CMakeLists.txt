@@ -26,9 +26,9 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
-file(GLOB COMMON_SRC "Network/Common/*.cpp")
-file(GLOB SERVER_ONLY_SRC "Network/Server/*.cpp")
-file(GLOB CLIENT_ONLY_SRC "Network/Client/*.cpp")
+file(GLOB_RECURSE COMMON_SRC "Network/Common/*.cpp")
+file(GLOB_RECURSE SERVER_ONLY_SRC "Network/Server/*.cpp")
+file(GLOB_RECURSE CLIENT_ONLY_SRC "Network/Client/*.cpp")
 file(GLOB_RECURSE TEST_SRC "Tests/*.cpp")
 
 add_executable(server ${SERVER_ONLY_SRC} ${COMMON_SRC})

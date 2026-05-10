@@ -3,8 +3,8 @@
 #include <cstdint>
 
 #include "Network/Common/Logger.hpp"
-#include "Network/Common/SharedPoolPtr.hpp"
-#include "Network/Common/SparsePool.hpp"
+#include "Network/Common/Pool/SharedPoolPtr.hpp"
+#include "Network/Common/Pool/SparsePool.hpp"
 
 SharedPoolPtr<Session> SessionManager::CreateSession() {
 	SharedPoolPtr<Session> sessionPtr =
