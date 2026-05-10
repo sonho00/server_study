@@ -3,6 +3,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <mutex>
 #include <numeric>
 #include <vector>
 
@@ -19,14 +20,7 @@ class SparseSetV2 {
 
 	static constexpr uint64_t kInvalidHandle = static_cast<uint64_t>(-1);
 
-	SparseSetV2() {
-		for (size_t i = 0; i < N; ++i) {
-			sparse_[i].where_ = i;
-		}
-		std::iota(std::begin(dense_), std::end(dense_), 0);
-		std::fill(cursor_.begin(), cursor_.end(), N);
-		cursor_[0] = 0;
-	}
+	SparseSetV2();
 
 	// idle(state 0)에서 핸들을 꺼내서 state로 이동.
 	// idle에 핸들이 없거나 state가 유효하지 않으면 kInvalidHandle 반환
@@ -42,16 +36,29 @@ class SparseSetV2 {
 	[[nodiscard]] uint64_t GetHandle(uint32_t who) const;
 
    private:
-	bool IncrementState(uint64_t handle);
-	bool DecrementState(uint64_t handle);
+	bool MoveToStateInternal(uint64_t handle, size_t newState);
+	bool IncrementStateInternal(uint64_t handle);
+	bool DecrementStateInternal(uint64_t handle);
 
 	static constexpr uint8_t kIndexShift = 32;
 
 	std::array<Slot, N> sparse_;
 	std::array<uint32_t, N> dense_;
-	// cursor_[i]는 state i의 시작 인덱스
+	// dense_[cursor_[state]]부터 dense_[cursor_[state + 1] - 1]까지
+	// state에 있는 핸들들의 인덱스
 	std::array<uint32_t, stateCount + 1> cursor_;
+	std::mutex mutex_;
 };
+
+template <size_t N, size_t stateCount>
+SparseSetV2<N, stateCount>::SparseSetV2() {
+	for (size_t i = 0; i < N; ++i) {
+		sparse_[i].where_ = i;
+	}
+	std::iota(std::begin(dense_), std::end(dense_), 0);
+	std::fill(cursor_.begin(), cursor_.end(), N);
+	cursor_[0] = 0;
+}
 
 template <size_t N, size_t stateCount>
 uint64_t SparseSetV2<N, stateCount>::Pop(size_t state) {
@@ -59,15 +66,18 @@ uint64_t SparseSetV2<N, stateCount>::Pop(size_t state) {
 		LOG_ERROR("Invalid state: {}, stateCount: {}", state, stateCount);
 		return kInvalidHandle;
 	}
-	if (cursor_[1] < 1) {
-		LOG_ERROR("No available handles.");
-		return kInvalidHandle;
+	uint64_t handle;
+	{
+		std::lock_guard lock(mutex_);
+		if (cursor_[1] < 1) {
+			LOG_ERROR("No available handles.");
+			return kInvalidHandle;
+		}
+
+		// state 0에서 한 개를 꺼내서 state로 이동
+		handle = GetHandle(dense_[cursor_[1] - 1]);
+		MoveToStateInternal(handle, state);
 	}
-
-	// state 0에서 한 개를 꺼내서 state로 이동
-	uint64_t handle = GetHandle(dense_[cursor_[1] - 1]);
-	MoveToState(handle, state);
-
 	return handle;
 }
 
@@ -76,7 +86,10 @@ bool SparseSetV2<N, stateCount>::Push(uint64_t handle) {
 	if (!IsValid(handle)) return false;
 
 	auto who = static_cast<uint32_t>(handle);
-	MoveToState(handle, 0);
+	{
+		std::lock_guard lock(mutex_);
+		MoveToStateInternal(handle, 0);
+	}
 	sparse_[who].generation_++;
 
 	return true;
@@ -85,14 +98,29 @@ bool SparseSetV2<N, stateCount>::Push(uint64_t handle) {
 template <size_t N, size_t stateCount>
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 bool SparseSetV2<N, stateCount>::MoveToState(uint64_t handle, size_t newState) {
-	if (!IsValid(handle)) return false;
+	if (newState >= stateCount) {
+		LOG_ERROR("Invalid newState: {}, stateCount: {}", newState, stateCount);
+		return false;
+	}
+	if (!IsValid(handle)) {
+		LOG_ERROR("Invalid handle: {}", handle);
+		return false;
+	}
 
+	std::lock_guard lock(mutex_);
+	return MoveToStateInternal(handle, newState);
+}
+
+template <size_t N, size_t stateCount>
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+bool SparseSetV2<N, stateCount>::MoveToStateInternal(uint64_t handle,
+													 size_t newState) {
 	auto who = static_cast<uint32_t>(handle);
 	while (sparse_[who].state_ < newState) {
-		if (!IncrementState(handle)) return false;
+		if (!IncrementStateInternal(handle)) return false;
 	}
 	while (sparse_[who].state_ > newState) {
-		if (!DecrementState(handle)) return false;
+		if (!DecrementStateInternal(handle)) return false;
 	}
 
 	return true;
@@ -107,12 +135,14 @@ std::vector<uint64_t> SparseSetV2<N, stateCount>::GetIndicesInState(
 		return result;
 	}
 
-	// cursor_[state]부터 cursor_[state + 1]까지가 state에 있는 핸들
-	result.reserve(cursor_[state + 1] - cursor_[state]);
-	for (size_t i = cursor_[state]; i < cursor_[state + 1]; ++i) {
-		result.push_back(GetHandle(dense_[i]));
+	{
+		std::lock_guard lock(mutex_);
+		// cursor_[state]부터 cursor_[state + 1]까지가 state에 있는 핸들
+		result.reserve(cursor_[state + 1] - cursor_[state]);
+		for (size_t i = cursor_[state]; i < cursor_[state + 1]; ++i) {
+			result.push_back(GetHandle(dense_[i]));
+		}
 	}
-
 	return result;
 }
 
@@ -139,9 +169,7 @@ uint64_t SparseSetV2<N, stateCount>::GetHandle(uint32_t who) const {
 }
 
 template <size_t N, size_t stateCount>
-bool SparseSetV2<N, stateCount>::IncrementState(uint64_t handle) {
-	if (!IsValid(handle)) return false;
-
+bool SparseSetV2<N, stateCount>::IncrementStateInternal(uint64_t handle) {
 	auto who = static_cast<uint32_t>(handle);
 	size_t currentState = sparse_[who].state_;
 	if (currentState >= stateCount - 1) {
@@ -164,9 +192,7 @@ bool SparseSetV2<N, stateCount>::IncrementState(uint64_t handle) {
 }
 
 template <size_t N, size_t stateCount>
-bool SparseSetV2<N, stateCount>::DecrementState(uint64_t handle) {
-	if (!IsValid(handle)) return false;
-
+bool SparseSetV2<N, stateCount>::DecrementStateInternal(uint64_t handle) {
 	auto who = static_cast<uint32_t>(handle);
 	size_t currentState = sparse_[who].state_;
 	if (currentState == 0) {
