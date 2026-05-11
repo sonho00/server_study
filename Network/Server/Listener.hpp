@@ -16,12 +16,13 @@ class Listener {
 	Listener(IocpCore& iocpCore, SessionManager& sessionManager, uint16_t port);
 	~Listener();
 
-	bool HandleAccept(const OverlappedEx& ovEx);
+	bool HandleAccept(SharedPoolPtr<Session>& session);
 	bool PostAccept();
 	bool RegisterAccept(SOCKET hAcceptSocket, SharedPoolPtr<Session>& session);
 
-   private:
 	OverlappedEx acceptOv_;
+
+   private:
 	SOCKET socket_ = INVALID_SOCKET;
 
 	IocpCore& iocpCore_;

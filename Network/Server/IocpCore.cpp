@@ -2,17 +2,17 @@
 #include "IocpCore.hpp"
 
 #include <WinSock2.h>
+#include <winnt.h>
 
 #include <thread>
 
 #include "Listener.hpp"
 #include "Network/Common/Logger.hpp"
 #include "Network/Common/Pool/SharedPoolPtr.hpp"
+#include "OverlappedEx.hpp"
 #include "Session.hpp"
-#include "SessionManager.hpp"
 
-IocpCore::IocpCore(SessionManager& sessionManager)
-	: sessionManager_(sessionManager) {
+IocpCore::IocpCore() {
 	hIocp_ = CreateIoCompletionPort(INVALID_HANDLE_VALUE, nullptr, 0, 0);
 	if (hIocp_ == nullptr) {
 		LOG_FATAL("[Error:{}] Failed to create IOCP", GetLastError());
@@ -59,51 +59,12 @@ bool IocpCore::Register(SOCKET socket, ULONG_PTR completionKey) const {
 	return true;
 }
 
-void IocpCore::HandleAccept(const IocpResult& iocpResult) {
-	if (iocpResult.result_ == FALSE) {
-		DWORD errorCode = GetLastError();
-		switch (errorCode) {
-			case ERROR_OPERATION_ABORTED:
-				LOG_INFO(
-					"[Session:{}] Accept operation was aborted, likely "
-					"due to server shutdown.",
-					static_cast<uint64_t>(iocpResult.completionKey_));
-				return;
-
-			default:
-				LOG_ERROR("[Session:{}][Error:{}] Failed to accept connection",
-						  static_cast<uint64_t>(iocpResult.completionKey_),
-						  errorCode);
-				break;
-		}
-
-		auto* session =
-			CONTAINING_RECORD(iocpResult.overlappedEx_, Session, readOv_);
-		LOG_ERROR("[Session:{}] Failed to accept connection",
-				  session->GetHandle());
-	} else {
-		Session* session =
-			CONTAINING_RECORD(iocpResult.overlappedEx_, Session, readOv_);
-
-		auto* listener = reinterpret_cast<Listener*>(iocpResult.completionKey_);
-		if (!listener->HandleAccept(
-				static_cast<const OverlappedEx&>(*iocpResult.overlappedEx_))) {
-			LOG_ERROR("[Session:{}] Failed to handle accept",
-					  session->GetHandle());
-			session->Disconnect();
-		}
-
-		LOG_INFO("[Session:{}] Accepted new connection", session->GetHandle());
-	}
-}
-
-void IocpCore::HandleError(const IocpResult& iocpResult) {
-	SharedPoolPtr<Session> session =
-		sessionManager_.GetSession(iocpResult.completionKey_);
+void IocpCore::HandleError(OverlappedEx& overlappedEx) {
+	SharedPoolPtr<Session> session = overlappedEx.sessionPtr_;
 	DWORD errorCode = GetLastError();
 	switch (errorCode) {
 		case WSAENOTCONN:
-			if (iocpResult.overlappedEx_->ioType_ == IO_TYPE::kDisconnect) {
+			if (overlappedEx.ioType_ == IO_TYPE::kDisconnect) {
 				LOG_ERROR(
 					"[Session:{}][Error:{}] DisconnectEx failed - client "
 					"already disconnected",
@@ -134,29 +95,49 @@ void IocpCore::HandleError(const IocpResult& iocpResult) {
 	}
 }
 
-void IocpCore::LogIOEvent(const IocpResult& iocpResult) {
-	SharedPoolPtr<Session> session =
-		sessionManager_.GetSession(iocpResult.completionKey_);
+void IocpCore::Dispatch(ULONG_PTR completionKey, OverlappedEx* overlappedEx,
+						DWORD bytesTransferred) {
+	SharedPoolPtr<Session> session = overlappedEx->sessionPtr_;
+	switch (overlappedEx->ioType_) {
+		case IO_TYPE::kAccept: {
+			auto* listener = reinterpret_cast<Listener*>(completionKey);
+			if (!listener->HandleAccept(session)) {
+				LOG_ERROR("[Session:{}] Failed to handle accept",
+						  session->GetHandle());
+				session->Disconnect();
+			}
+			break;
+		}
+		case IO_TYPE::kDisconnect: {
+			LOG_INFO("[Session:{}] Disconnect completed", session->GetHandle());
+			session->Reset();
+			break;
+		}
+		case IO_TYPE::kRecv:
+		case IO_TYPE::kSend: {
+			LOG_DEBUG("[Session:{}] Dispatching I/O event - IOType: {}",
+					  session->GetHandle(),
+					  static_cast<int>(overlappedEx->ioType_));
 
-	LOG_DEBUG("[Session:{}] IOType: {} BytesTransferred: {}",
-			  session->GetHandle(),
-			  static_cast<int>(iocpResult.overlappedEx_->ioType_),
-			  iocpResult.bytesTransferred_);
-}
+			if (bytesTransferred == 0) {
+				LOG_INFO("[Session:{}] Connection closed by client",
+						 session->GetHandle());
+				session->Disconnect();
+				return;
+			}
 
-void IocpCore::Dispatch(const IocpResult& iocpResult) {
-	SharedPoolPtr<Session> session =
-		sessionManager_.GetSession(iocpResult.completionKey_);
-
-	LOG_DEBUG("[Session:{}] Dispatching I/O event - IOType: {}",
-			  session->GetHandle(),
-			  static_cast<int>(iocpResult.overlappedEx_->ioType_));
-
-	if (!session->HandleIO(*iocpResult.overlappedEx_,
-						   iocpResult.bytesTransferred_)) {
-		LOG_ERROR("[Session:{}] Failed to handle I/O operation",
-				  session->GetHandle());
-		session->Disconnect();
+			if (!session->HandleIO(*overlappedEx, bytesTransferred)) {
+				LOG_ERROR("[Session:{}] Failed to handle I/O operation",
+						  session->GetHandle());
+				session->Disconnect();
+			}
+			break;
+		}
+		default:
+			LOG_ERROR("[Session:{}] Unknown I/O type: {}",
+					  overlappedEx->sessionPtr_->GetHandle(),
+					  static_cast<int>(overlappedEx->ioType_));
+			return;
 	}
 }
 
@@ -179,26 +160,19 @@ void IocpCore::WorkerThread() {
 
 		OverlappedEx* overlappedEx =
 			CONTAINING_RECORD(overlapped, OverlappedEx, overlapped_);
-		IocpResult iocpResult = {.result_ = result,
-								 .bytesTransferred_ = bytesTransferred,
-								 .completionKey_ = completionKey,
-								 .overlappedEx_ = overlappedEx};
 
-		if (overlappedEx->ioType_ == IO_TYPE::kAccept) {
-			HandleAccept(iocpResult);
+		if (result == FALSE) {
+			HandleError(*overlappedEx);
 			continue;
 		}
 
-		SharedPoolPtr<Session> session =
-			sessionManager_.GetSession(completionKey);
+		SharedPoolPtr<Session> session = overlappedEx->sessionPtr_;
 
-		if (result == 0 || bytesTransferred == 0) {
-			HandleError(iocpResult);
-			continue;
-		}
+		LOG_DEBUG("[Session:{}] IOType: {} BytesTransferred: {}",
+				  session->GetHandle(), static_cast<int>(overlappedEx->ioType_),
+				  bytesTransferred);
 
-		LogIOEvent(iocpResult);
-		Dispatch(iocpResult);
+		Dispatch(completionKey, overlappedEx, bytesTransferred);
 	}
 }
 // NOLINTEND(performance-no-int-to-ptr)

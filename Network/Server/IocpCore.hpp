@@ -7,18 +7,9 @@
 
 #include "OverlappedEx.hpp"
 
-class SessionManager;
-
-struct IocpResult {
-	BOOL result_;
-	DWORD bytesTransferred_;
-	ULONG_PTR completionKey_;
-	OverlappedEx* overlappedEx_;
-};
-
 class IocpCore {
    public:
-	IocpCore(SessionManager& sessionManager);
+	IocpCore();
 	~IocpCore();
 
 	bool Start(size_t threadCount);
@@ -27,12 +18,10 @@ class IocpCore {
    private:
 	void WorkerThread();
 
-	static void HandleAccept(const IocpResult& iocpResult);
-	void HandleError(const IocpResult& iocpResult);
-	void LogIOEvent(const IocpResult& iocpResult);
-	void Dispatch(const IocpResult& iocpResult);
+	static void HandleError(OverlappedEx& overlappedEx);
+	static void Dispatch(ULONG_PTR completionKey, OverlappedEx* overlappedEx,
+						 DWORD bytesTransferred);
 
 	std::vector<std::thread> threads_;
 	HANDLE hIocp_;
-	SessionManager& sessionManager_;
 };

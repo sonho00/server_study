@@ -38,6 +38,8 @@ Listener::Listener(IocpCore& iocpCore, SessionManager& sessionManager,
 	if (!iocpCore_.Register(socket_, reinterpret_cast<ULONG_PTR>(this))) {
 		LOG_FATAL("Failed to register listener socket with IOCP");
 	}
+
+	LOG_DEBUG("Listener address: {}", static_cast<void*>(this));
 }
 
 Listener::~Listener() {
@@ -47,11 +49,10 @@ Listener::~Listener() {
 	}
 }
 
-bool Listener::HandleAccept(const OverlappedEx& ovEx) {
+bool Listener::HandleAccept(SharedPoolPtr<Session>& session) {
 	PostAccept();
 
-	Session& session = *CONTAINING_RECORD(&ovEx, Session, readOv_);
-	if (setsockopt(session.socket_, SOL_SOCKET, SO_UPDATE_ACCEPT_CONTEXT,
+	if (setsockopt(session->socket_, SOL_SOCKET, SO_UPDATE_ACCEPT_CONTEXT,
 				   reinterpret_cast<const char*>(&socket_),
 				   sizeof(socket_)) == SOCKET_ERROR) {
 		LOG_ERROR("setsockopt(SO_UPDATE_ACCEPT_CONTEXT) failed: {}",
@@ -59,12 +60,12 @@ bool Listener::HandleAccept(const OverlappedEx& ovEx) {
 		return false;
 	}
 
-	if (!iocpCore_.Register(session.socket_, session.GetHandle())) {
+	if (!iocpCore_.Register(session->socket_, session.GetHandle())) {
 		LOG_ERROR("Failed to register accept socket with IOCP");
 		return false;
 	}
 
-	if (!session.RegisterRead()) {
+	if (!session->RegisterRead()) {
 		LOG_ERROR("Failed to post initial read");
 		return false;
 	}
@@ -99,8 +100,8 @@ bool Listener::RegisterAccept(SOCKET hAcceptSocket,
 	session->readOv_.wsaBuf_.buf = session->readOv_.buffer_.GetBuffer();
 	session->readOv_.wsaBuf_.len =
 		static_cast<ULONG>(session->readOv_.buffer_.GetSize());
-	session->socket_ = hAcceptSocket;
 	session->readOv_.sessionPtr_ = session;
+	session->socket_ = hAcceptSocket;
 
 	DWORD bytesReceived = 0;
 	BOOL result = ServerUtils::AcceptEx(

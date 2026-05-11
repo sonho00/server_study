@@ -11,9 +11,7 @@
 
 class ServerService {
    public:
-	ServerService()
-		: iocpCore_(sessionManager_),
-		  listener_(iocpCore_, sessionManager_, Config::kPort) {}
+	ServerService() : listener_(iocpCore_, sessionManager_, Config::kPort) {}
 
 	bool Start() {
 		size_t numThreads = std::thread::hardware_concurrency();

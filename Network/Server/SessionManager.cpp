@@ -10,14 +10,16 @@ SharedPoolPtr<Session> SessionManager::CreateSession() {
 	SharedPoolPtr<Session> sessionPtr =
 		sessionPool_.Acquire(static_cast<size_t>(SessionState::kIdle));
 	if (!sessionPtr.IsValid()) {
-		LOG_ERROR("Failed to create session: No available handles");
+		LOG_WARN("Failed to create session: No available handles");
 		return nullptr;
 	}
-	sessionPool_.MoveToState(sessionPtr.GetHandle(),
+
+	uint64_t handle = sessionPtr.GetHandle();
+	sessionPool_.MoveToState(handle,
 							 static_cast<size_t>(SessionState::kPending));
 	sessionPtr->sessionManager_ = this;
-	sessionPtr->handle_ = sessionPtr.GetHandle();
-	auto idx = static_cast<uint32_t>(sessionPtr->handle_);
+	sessionPtr->handle_ = handle;
+	auto idx = static_cast<uint32_t>(handle);
 	sessionPtrs_[idx] = std::move(sessionPtr);
 	return sessionPtrs_[idx];
 }

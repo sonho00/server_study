@@ -199,12 +199,15 @@ void Session::Disconnect() {
 					  errorCode);
 		}
 	}
+
+	socket_ = INVALID_SOCKET;
 }
 
 void Session::Reset() {
 	std::lock_guard<std::mutex> lock(mtx_);
 	readOv_.Reset();
 	writeOv_.Reset();
+	disconnectOv_.Reset();
 	socket_ = INVALID_SOCKET;
 	isSending_ = false;
 }
