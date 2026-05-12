@@ -63,15 +63,6 @@ void IocpCore::HandleError(OverlappedEx& overlappedEx) {
 	SharedPoolPtr<Session> session = overlappedEx.sessionPtr_;
 	DWORD errorCode = GetLastError();
 	switch (errorCode) {
-		case WSAENOTCONN:
-			if (overlappedEx.ioType_ == IO_TYPE::kDisconnect) {
-				LOG_ERROR(
-					"[Session:{}][Error:{}] DisconnectEx failed - client "
-					"already disconnected",
-					session->GetHandle(), errorCode);
-				session->Clear();
-				return;
-			}
 		case ERROR_SUCCESS:
 		case ERROR_IO_PENDING:
 			LOG_INFO("[Session:{}][Error:{}] Graceful disconnect detected",
@@ -109,9 +100,6 @@ void IocpCore::Dispatch(OverlappedEx* overlappedEx, DWORD bytesTransferred) {
 		case IO_TYPE::kDisconnect: {
 			LOG_INFO("[Session:{}] Disconnect completed", session->GetHandle());
 			session->Clear();
-			if (!session->listener_->PostAccept()) {
-				LOG_ERROR("Failed to post accept after disconnect");
-			}
 			break;
 		}
 		case IO_TYPE::kRecv:

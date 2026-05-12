@@ -8,7 +8,6 @@
 #include "Network/Common/Pool/SparsePool.hpp"
 #include "Session.hpp"
 
-enum class SessionState : uint8_t { kIdle = 0, kPending = 1, kActive = 2 };
 class Listener;
 
 class SessionManager {
@@ -18,9 +17,13 @@ class SessionManager {
 	SharedPoolPtr<Session> CreateSession();
 	bool ConnectSession(uint64_t handle);
 	bool DisconnectSession(uint64_t handle);
+
 	SharedPoolPtr<Session> GetSession(uint64_t handle);
+	bool SetState(uint64_t handle, SessionState newState);
 
    private:
-	SparsePool<Session, Config::kPoolSize, 3> sessionPool_;
+	SparsePool<Session, Config::kPoolSize,
+			   static_cast<size_t>(SessionState::kCnt)>
+		sessionPool_;
 	std::array<SharedPoolPtr<Session>, Config::kPoolSize> sessionPtrs_;
 };

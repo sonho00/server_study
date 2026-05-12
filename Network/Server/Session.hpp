@@ -11,6 +11,14 @@
 #include "Network/Common/Protocol.hpp"
 #include "OverlappedEx.hpp"
 
+enum class SessionState : uint8_t {
+	kIdle,
+	kPending,
+	kConnected,
+	kDisconnecting,
+	kCnt
+};
+
 class SessionManager;
 class Listener;
 
@@ -42,6 +50,7 @@ class Session {
    private:
 	SessionManager* sessionManager_ = nullptr;
 	uint64_t handle_ = SparseSet<Config::kPoolSize>::kInvalidHandle;
+	SessionState state_ = SessionState::kIdle;
 	std::mutex mtx_;
 	bool isSending_ = false;
 

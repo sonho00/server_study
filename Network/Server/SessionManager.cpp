@@ -35,17 +35,26 @@ SharedPoolPtr<Session> SessionManager::CreateSession() {
 }
 
 bool SessionManager::ConnectSession(uint64_t handle) {
-	return sessionPool_.MoveToState(handle,
-									static_cast<size_t>(SessionState::kActive));
+	return sessionPool_.MoveToState(
+		handle, static_cast<size_t>(SessionState::kConnected));
 }
 
 bool SessionManager::DisconnectSession(uint64_t handle) {
-	return sessionPool_.Release(handle);
+	auto idx = static_cast<uint32_t>(handle);
+	sessionPtrs_[idx].Reset();
+	return SetState(handle, SessionState::kDisconnecting);
 }
 
 SharedPoolPtr<Session> SessionManager::GetSession(uint64_t handle) {
-	if (!sessionPool_.IsValid(handle)) return nullptr;
+	if (!sessionPool_.IsValid(handle)) {
+		LOG_ERROR("Invalid session handle: {}", handle);
+		return nullptr;
+	}
 
 	auto idx = static_cast<uint32_t>(handle);
 	return sessionPtrs_[idx];
+}
+
+bool SessionManager::SetState(uint64_t handle, SessionState newState) {
+	return sessionPool_.MoveToState(handle, static_cast<size_t>(newState));
 }
