@@ -42,7 +42,8 @@ SharedPoolPtr<T>::SharedPoolPtr(ISparsePool<T>* pool, uint64_t handle)
 }
 
 template <typename T>
-SharedPoolPtr<T>::SharedPoolPtr(std::nullptr_t) : pool_(nullptr), handle_(0) {}
+SharedPoolPtr<T>::SharedPoolPtr(std::nullptr_t)
+	: pool_(nullptr), handle_(ISparsePool<T>::kInvalidHandle) {}
 
 template <typename T>
 SharedPoolPtr<T>::SharedPoolPtr(const SharedPoolPtr& other)
@@ -74,7 +75,7 @@ template <typename T>
 SharedPoolPtr<T>::SharedPoolPtr(SharedPoolPtr&& other) noexcept
 	: pool_(other.pool_), handle_(other.handle_) {
 	other.pool_ = nullptr;
-	other.handle_ = 0;
+	other.handle_ = ISparsePool<T>::kInvalidHandle;
 }
 
 template <typename T>
@@ -86,7 +87,7 @@ SharedPoolPtr<T>& SharedPoolPtr<T>::operator=(SharedPoolPtr&& other) noexcept {
 		handle_ = other.handle_;
 
 		other.pool_ = nullptr;
-		other.handle_ = 0;
+		other.handle_ = ISparsePool<T>::kInvalidHandle;
 	}
 	return *this;
 }
@@ -125,7 +126,7 @@ bool SharedPoolPtr<T>::Reset() {
 			return true;
 		}
 		pool_ = nullptr;
-		handle_ = 0;
+		handle_ = ISparsePool<T>::kInvalidHandle;
 	}
 	return false;
 }
