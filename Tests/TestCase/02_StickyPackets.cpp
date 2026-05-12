@@ -10,6 +10,12 @@
 
 class StickyPackets : public Client {
    public:
+	StickyPackets() {
+		CreateSocket();
+		DefaultSockOpt();
+		Connect();
+	}
+
 	void ThreadFunc() override {
 		reinterpret_cast<PACKET_HEADER*>(sendBuf_.data())->size = 50004;
 		reinterpret_cast<PACKET_HEADER*>(sendBuf_.data())->id =
@@ -52,6 +58,10 @@ class StickyPackets : public Client {
 		return success_ &&
 			   memcmp(sendBuf_.data(), recvBuf_.data(), 150012) == 0;
 	}
+
+   private:
+	std::array<char, 160000> sendBuf_;
+	std::array<char, 160000> recvBuf_;
 };
 
 TEST(NetworkTest, StickyPackets) {

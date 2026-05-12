@@ -10,6 +10,12 @@
 
 class Fragmentation : public Client {
    public:
+	Fragmentation() {
+		CreateSocket();
+		DefaultSockOpt();
+		Connect();
+	}
+
 	void ThreadFunc() override {
 		auto* packet = reinterpret_cast<C2S_CHAT*>(sendBuf_.data());
 		packet->header.id = static_cast<uint16_t>(C2S_PACKET_ID::kChat);
@@ -42,6 +48,10 @@ class Fragmentation : public Client {
 		clientThread.join();
 		return success_ && memcmp(sendBuf_.data(), recvBuf_.data(), 404) == 0;
 	}
+
+   private:
+	std::array<char, 500> sendBuf_;
+	std::array<char, 500> recvBuf_;
 };
 
 TEST(NetworkTest, Fragmentation) {

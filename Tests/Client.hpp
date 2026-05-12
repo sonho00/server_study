@@ -2,15 +2,14 @@
 
 #include <WinSock2.h>
 
-#include <array>
-
 #include "Network/Common/Protocol.hpp"
 #include "Network/Common/WSAManager.hpp"
 
 class Client {
    public:
-	Client();
 	~Client();
+
+	void CreateSocket();
 
 	[[nodiscard]] bool SendPacket(const PACKET_HEADER& header) const;
 	[[nodiscard]] PACKET_HEADER* ReceivePacket(char* buffer);
@@ -23,10 +22,11 @@ class Client {
 	virtual void ThreadFunc() = 0;
 	virtual bool test() = 0;
 
-	bool success_ = true;
+	void DefaultSockOpt();
+	virtual void AdditionalSockOpt() {}
+	virtual int Connect();
 
-	inline static std::array<char, 1 << 20> sendBuf_;
-	inline static std::array<char, 1 << 20> recvBuf_;
+	bool success_ = true;
 
 	static constexpr const char* kIpAddr_ = "127.0.0.1";
 	static constexpr uint16_t kPort_ = 12345;
