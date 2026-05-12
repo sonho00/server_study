@@ -18,13 +18,12 @@ class Listener {
 
 	bool HandleAccept(SharedPoolPtr<Session>& session);
 	bool PostAccept();
-	bool RegisterAccept(SOCKET hAcceptSocket, SharedPoolPtr<Session>& session);
+	bool RegisterAccept(SharedPoolPtr<Session>& session);
 
+	SOCKET socket_ = INVALID_SOCKET;
 	OverlappedEx acceptOv_;
 
    private:
-	SOCKET socket_ = INVALID_SOCKET;
-
 	IocpCore& iocpCore_;
 	SessionManager& sessionManager_;
 	uint16_t port_;

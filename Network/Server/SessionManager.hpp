@@ -8,11 +8,14 @@
 #include "Network/Common/Pool/SparsePool.hpp"
 #include "Session.hpp"
 
+class IocpCore;
 class Listener;
 
 class SessionManager {
    public:
 	SessionManager();
+
+	bool Init(IocpCore& iocpCore);
 
 	SharedPoolPtr<Session> CreateSession();
 	bool ConnectSession(uint64_t handle);

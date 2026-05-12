@@ -20,6 +20,5 @@ class ISparsePool {
 
 	[[nodiscard]] virtual bool IsValid(uint64_t handle) const = 0;
 
-	[[nodiscard]] virtual T* Get(uint64_t handle) = 0;
-	virtual bool Release(uint64_t handle) = 0;
+	[[nodiscard]] virtual T* GetObj(uint64_t handle) = 0;
 };

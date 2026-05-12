@@ -1,7 +1,10 @@
 #include "SessionManager.hpp"
 
+#include <algorithm>
 #include <cstdint>
+#include <vector>
 
+#include "IocpCore.hpp"
 #include "Listener.hpp"
 #include "Network/Common/Logger.hpp"
 #include "Network/Common/Pool/SharedPoolPtr.hpp"
@@ -15,6 +18,20 @@ SessionManager::SessionManager()
 		  session->handle_ = SparseSet<Config::kPoolSize>::kInvalidHandle;
 		  session->listener_->PostAccept();
 	  }) {}
+
+bool SessionManager::Init(IocpCore& iocpCore) {
+	std::vector<uint64_t> handles = sessionPool_.GetIndicesInState(
+		static_cast<size_t>(SessionState::kIdle));
+
+	return std::ranges::all_of(handles, [this, &iocpCore](uint64_t handle) {
+		Session* session = sessionPool_.GetObj(handle);
+		if (!iocpCore.Register(session->socket_, session->GetHandle())) {
+			LOG_ERROR("Failed to register accept socket with IOCP");
+			return false;
+		}
+		return true;
+	});
+}
 
 SharedPoolPtr<Session> SessionManager::CreateSession() {
 	SharedPoolPtr<Session> sessionPtr =

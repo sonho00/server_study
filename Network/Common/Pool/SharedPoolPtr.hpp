@@ -106,7 +106,7 @@ bool SharedPoolPtr<T>::IsValid() const {
 
 template <typename T>
 T* SharedPoolPtr<T>::Get() const {
-	return IsValid() ? pool_->Get(handle_) : nullptr;
+	return IsValid() ? pool_->GetObj(handle_) : nullptr;
 }
 
 template <typename T>

@@ -15,6 +15,7 @@ class ServerService {
 
 	bool Start() {
 		iocpCore_.SetListener(&listener_);
+		sessionManager_.Init(iocpCore_);
 
 		size_t numThreads = std::thread::hardware_concurrency();
 		if (!iocpCore_.Start(numThreads)) {

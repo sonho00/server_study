@@ -40,15 +40,16 @@ class Session {
 	bool Clear();
 
 	[[nodiscard]] uint64_t GetHandle() const { return handle_; }
+	[[nodiscard]] SOCKET GetSocket() const { return socket_; }
 
 	OverlappedEx readOv_;
 	OverlappedEx writeOv_;
 	OverlappedEx disconnectOv_;
-	SOCKET socket_ = INVALID_SOCKET;
 	Listener* listener_ = nullptr;
 
    private:
 	SessionManager* sessionManager_ = nullptr;
+	SOCKET socket_ = INVALID_SOCKET;
 	uint64_t handle_ = SparseSet<Config::kPoolSize>::kInvalidHandle;
 	SessionState state_ = SessionState::kIdle;
 	std::mutex mtx_;

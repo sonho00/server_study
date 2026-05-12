@@ -40,30 +40,6 @@ NetFuncs::NetFuncs() {
 	closesocket(dummySocket);
 }
 
-SOCKET CreateListenSocket(USHORT port) {
-	SOCKET listenSocket = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, nullptr,
-									0, WSA_FLAG_OVERLAPPED);
-	if (listenSocket == INVALID_SOCKET) {
-		LOG_FATAL("[Error:{}] WSASocket failed", WSAGetLastError());
-	}
-
-	sockaddr_in serverAddr{};
-	serverAddr.sin_family = AF_INET;
-	serverAddr.sin_addr.s_addr = INADDR_ANY;
-	serverAddr.sin_port = htons(port);
-
-	if (bind(listenSocket, reinterpret_cast<sockaddr*>(&serverAddr),
-			 sizeof(serverAddr)) == SOCKET_ERROR) {
-		LOG_FATAL("[Error:{}] bind failed", WSAGetLastError());
-	}
-
-	if (listen(listenSocket, SOMAXCONN) == SOCKET_ERROR) {
-		LOG_FATAL("[Error:{}] listen failed", WSAGetLastError());
-	}
-
-	return listenSocket;
-}
-
 LPFN_ACCEPTEX AcceptEx = nullptr;
 LPFN_DISCONNECTEX DisconnectEx = nullptr;
 }  // namespace ServerUtils

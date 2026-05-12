@@ -23,16 +23,15 @@ class SparsePool : public ISparsePool<T>, public SparseSet<N, StateCount> {
 
 	template <typename... Args>
 	SharedPoolPtr<T> Acquire(size_t state = 1, Args&&... args);
-	bool Release(uint64_t handle) override;
 
 	bool AddRef(uint64_t handle) override;
 	bool ReleaseRef(uint64_t handle) override;
 
 	[[nodiscard]] bool IsValid(uint64_t handle) const override;
 
-   private:
-	[[nodiscard]] T* Get(uint64_t handle) override;
+	[[nodiscard]] T* GetObj(uint64_t handle) override;
 
+   private:
 	ObjectPool<Slot, N, isLazy> pool_;
 };
 
@@ -52,18 +51,6 @@ SharedPoolPtr<T> SparsePool<T, N, StateCount, isLazy>::Acquire(size_t state,
 	SparseSet<N, StateCount>::MoveToState(handle, state);
 
 	return SharedPoolPtr<T>(this, handle);
-}
-
-template <typename T, size_t N, size_t StateCount, bool isLazy>
-bool SparsePool<T, N, StateCount, isLazy>::Release(uint64_t handle) {
-	if (!IsValid(handle)) {
-		LOG_ERROR("Invalid handle: {}", handle);
-		return false;
-	}
-
-	ReleaseRef(handle);
-
-	return true;
 }
 
 template <typename T, size_t N, size_t StateCount, bool isLazy>
@@ -90,8 +77,8 @@ bool SparsePool<T, N, StateCount, isLazy>::ReleaseRef(uint64_t handle) {
 	auto idx = static_cast<uint32_t>(handle);
 	Slot* slot = pool_.Get(idx);
 	if (slot->refCount_.fetch_sub(1, std::memory_order_acq_rel) == 1) {
-		if constexpr (isLazy) slot->obj_.~T();
 		SparseSet<N, StateCount>::Push(handle);
+		pool_.Release(idx);
 		return true;
 	}
 
@@ -104,7 +91,7 @@ bool SparsePool<T, N, StateCount, isLazy>::IsValid(uint64_t handle) const {
 }
 
 template <typename T, size_t N, size_t StateCount, bool isLazy>
-T* SparsePool<T, N, StateCount, isLazy>::Get(uint64_t handle) {
+T* SparsePool<T, N, StateCount, isLazy>::GetObj(uint64_t handle) {
 	if (!IsValid(handle)) {
 		LOG_ERROR("Invalid handle: {}", handle);
 		return nullptr;
