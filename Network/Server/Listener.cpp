@@ -2,6 +2,7 @@
 
 #include <WinSock2.h>
 
+#include <atomic>
 #include <cstdint>
 
 #include "IocpCore.hpp"
@@ -64,8 +65,10 @@ bool Listener::HandleAccept(SharedPoolPtr<Session>& session) {
 	if (setsockopt(session->GetSocket(), SOL_SOCKET, SO_UPDATE_ACCEPT_CONTEXT,
 				   reinterpret_cast<const char*>(&socket_),
 				   sizeof(socket_)) == SOCKET_ERROR) {
-		LOG_ERROR("setsockopt(SO_UPDATE_ACCEPT_CONTEXT) failed: {}",
-				  WSAGetLastError());
+		LOG_ERROR(
+			"[Session:{}][Error:{}] setsockopt(SO_UPDATE_ACCEPT_CONTEXT) "
+			"failed",
+			session->GetHandle(), WSAGetLastError());
 		return false;
 	}
 
@@ -73,12 +76,14 @@ bool Listener::HandleAccept(SharedPoolPtr<Session>& session) {
 	if (setsockopt(session->GetSocket(), IPPROTO_TCP, TCP_NODELAY,
 				   reinterpret_cast<const char*>(&opt),
 				   sizeof(opt)) == SOCKET_ERROR) {
-		LOG_ERROR("setsockopt(TCP_NODELAY) failed: {}", WSAGetLastError());
+		LOG_ERROR("[Session:{}][Error:{}] setsockopt(TCP_NODELAY) failed",
+				  session->GetHandle(), WSAGetLastError());
 		return false;
 	}
 
 	if (!session->RegisterRead()) {
-		LOG_ERROR("Failed to post initial read");
+		LOG_ERROR("[Session:{}] Failed to post initial read",
+				  session->GetHandle());
 		return false;
 	}
 
@@ -86,19 +91,33 @@ bool Listener::HandleAccept(SharedPoolPtr<Session>& session) {
 }
 
 bool Listener::PostAccept() {
-	while (pendingAccepts_ < Config::kAcceptCount) {
+	while (true) {
+		size_t current = pendingAccepts_.load();
+		if (current >= Config::kAcceptCount) {
+			break;
+		}
+
+		if (!pendingAccepts_.compare_exchange_strong(current, current + 1))
+			continue;
+
 		SharedPoolPtr<Session> session = sessionManager_.CreateSession();
-		if (!session.IsValid()) return false;
+		if (!session.IsValid()) {
+			pendingAccepts_--;
+			LOG_WARN("No available session for accept");
+			return false;
+		}
 
 		if (!RegisterAccept(session)) {
-			LOG_ERROR("Failed to post AcceptEx");
+			pendingAccepts_--;
+			LOG_ERROR("[Session:{}] Failed to post AcceptEx",
+					  session->GetHandle());
 			session->Disconnect();
 			return false;
 		}
 
 		session->listener_ = this;
-		pendingAccepts_++;
-		LOG_DEBUG("Posted AcceptEx - Pending accepts: {}", pendingAccepts_);
+		LOG_DEBUG("Posted AcceptEx - Pending accepts: {}",
+				  pendingAccepts_.load());
 	}
 	return true;
 }
@@ -121,7 +140,8 @@ bool Listener::RegisterAccept(SharedPoolPtr<Session>& session) {
 	if (result == 0) {
 		int errorCode = WSAGetLastError();
 		if (errorCode != ERROR_IO_PENDING) {
-			LOG_ERROR("AcceptEx failed: {}", errorCode);
+			LOG_ERROR("[Session:{}] AcceptEx failed: {}", session.GetHandle(),
+					  errorCode);
 			return false;
 		}
 	}

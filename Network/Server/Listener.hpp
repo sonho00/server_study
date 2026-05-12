@@ -3,6 +3,7 @@
 #include <WinSock2.h>
 #include <mswsock.h>
 
+#include <atomic>
 #include <cstdint>
 
 #include "Network/Common/Pool/SharedPoolPtr.hpp"
@@ -28,5 +29,5 @@ class Listener {
 	SessionManager& sessionManager_;
 	uint16_t port_;
 
-	size_t pendingAccepts_ = 0;
+	std::atomic<size_t> pendingAccepts_ = 0;
 };
