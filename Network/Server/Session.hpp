@@ -29,25 +29,30 @@ class Session {
 	Session();
 
 	bool RegisterRead();
-	bool RegisterWrite();
 	bool SendPacket(const PACKET_HEADER& header);
 
-	bool OnRead(DWORD bytesTransferred);
-	bool OnWrite(DWORD bytesTransferred);
 	bool HandleIO(OverlappedEx& ovEx, DWORD bytesTransferred);
 
 	bool Disconnect();
-	bool Clear();
 
 	[[nodiscard]] uint64_t GetHandle() const { return handle_; }
 	[[nodiscard]] SOCKET GetSocket() const { return socket_; }
+	[[nodiscard]] Listener* GetListener() const { return listener_; }
+	void SetListener(Listener* listener) { listener_ = listener; }
 
 	OverlappedEx readOv_;
 	OverlappedEx writeOv_;
 	OverlappedEx disconnectOv_;
-	Listener* listener_ = nullptr;
 
    private:
+	bool RegisterWrite();
+
+	bool OnRead(DWORD bytesTransferred);
+	bool OnWrite(DWORD bytesTransferred);
+
+	bool Clear();
+
+	Listener* listener_ = nullptr;
 	SessionManager* sessionManager_ = nullptr;
 	SOCKET socket_ = INVALID_SOCKET;
 	uint64_t handle_ = SparseSet<Config::kPoolSize>::kInvalidHandle;

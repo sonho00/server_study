@@ -112,7 +112,7 @@ bool Listener::PostAccept() {
 			return false;
 		}
 
-		sessionPtr->listener_ = this;
+		sessionPtr->SetListener(this);
 	}
 	return true;
 }

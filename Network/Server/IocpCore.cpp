@@ -64,7 +64,7 @@ void IocpCore::Dispatch(OverlappedEx* overlappedEx, DWORD bytesTransferred) {
 	SharedPoolPtr<Session> sessionPtr = overlappedEx->sessionPtr_;
 	switch (overlappedEx->ioType_) {
 		case IO_TYPE::kAccept: {
-			if (!sessionPtr->listener_->HandleAccept(sessionPtr)) {
+			if (!sessionPtr->GetListener()->HandleAccept(sessionPtr)) {
 				LOG_ERROR("[Session:{}] Failed to handle accept",
 						  sessionPtr->GetHandle());
 			} else {
@@ -130,7 +130,7 @@ void IocpCore::WorkerThread() {
 		SharedPoolPtr<Session> sessionPtr = overlappedEx->sessionPtr_;
 
 		if (overlappedEx->ioType_ == IO_TYPE::kAccept) {
-			sessionPtr->listener_->DecrementPendingAccepts();
+			sessionPtr->GetListener()->DecrementPendingAccepts();
 		}
 
 		if (result == FALSE) {
