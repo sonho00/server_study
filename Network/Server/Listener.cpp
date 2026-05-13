@@ -59,9 +59,6 @@ Listener::~Listener() {
 }
 
 bool Listener::HandleAccept(SharedPoolPtr<Session>& session) {
-	pendingAccepts_--;
-	PostAccept();
-
 	if (setsockopt(session->GetSocket(), SOL_SOCKET, SO_UPDATE_ACCEPT_CONTEXT,
 				   reinterpret_cast<const char*>(&socket_),
 				   sizeof(socket_)) == SOCKET_ERROR) {
