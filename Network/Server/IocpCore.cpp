@@ -67,7 +67,6 @@ void IocpCore::Dispatch(OverlappedEx* overlappedEx, DWORD bytesTransferred) {
 			if (!session->listener_->HandleAccept(session)) {
 				LOG_ERROR("[Session:{}] Failed to handle accept",
 						  session->GetHandle());
-				session->Disconnect();
 			} else {
 				LOG_INFO("[Session:{}] Accept completed", session->GetHandle());
 			}
@@ -102,6 +101,7 @@ void IocpCore::Dispatch(OverlappedEx* overlappedEx, DWORD bytesTransferred) {
 			LOG_ERROR("[Session:{}] Unknown I/O type: {}",
 					  overlappedEx->sessionPtr_->GetHandle(),
 					  static_cast<int>(overlappedEx->ioType_));
+			session->Disconnect();
 			return;
 	}
 }
@@ -126,6 +126,10 @@ void IocpCore::WorkerThread() {
 		OverlappedEx* overlappedEx =
 			CONTAINING_RECORD(overlapped, OverlappedEx, overlapped_);
 		SharedPoolPtr<Session> session = overlappedEx->sessionPtr_;
+
+		if (overlappedEx->ioType_ == IO_TYPE::kAccept) {
+			session->listener_->DecrementPendingAccepts();
+		}
 
 		if (result == FALSE) {
 			ServerUtils::HandleError(session, static_cast<int>(GetLastError()));

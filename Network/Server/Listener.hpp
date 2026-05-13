@@ -21,6 +21,8 @@ class Listener {
 	bool PostAccept();
 	bool RegisterAccept(SharedPoolPtr<Session>& session);
 
+	void DecrementPendingAccepts();
+
 	SOCKET socket_ = INVALID_SOCKET;
 	OverlappedEx acceptOv_;
 

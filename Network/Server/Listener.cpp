@@ -148,3 +148,8 @@ bool Listener::RegisterAccept(SharedPoolPtr<Session>& session) {
 
 	return true;
 }
+
+void Listener::DecrementPendingAccepts() {
+	pendingAccepts_--;
+	PostAccept();
+}

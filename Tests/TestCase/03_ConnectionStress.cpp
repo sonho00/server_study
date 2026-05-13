@@ -13,7 +13,7 @@ class ConnectionStress : public Client {
 		try {
 			for (int i = 0; i < 1000; ++i) {
 				ConnectionStress client;
-				while (true) {
+				for (int j = 0;; ++j) {
 					client.CreateSocket();
 					client.DefaultSockOpt();
 					client.AdditionalSockOpt();
@@ -25,7 +25,7 @@ class ConnectionStress : public Client {
 
 						case WSAECONNREFUSED:
 							LOG_WARN("Connection refused, retrying...");
-							Sleep(100);
+							Sleep(1 << j);
 							continue;
 
 						default:

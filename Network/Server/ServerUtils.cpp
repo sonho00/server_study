@@ -57,7 +57,7 @@ void HandleError(SharedPoolPtr<Session>& session, int errorCode) {
 			break;
 
 		case ERROR_OPERATION_ABORTED:
-			LOG_INFO(
+			LOG_WARN(
 				"[Session:{}][Error:{}] Operation aborted, likely due to "
 				"server shutdown",
 				session->GetHandle(), errorCode);
@@ -68,6 +68,13 @@ void HandleError(SharedPoolPtr<Session>& session, int errorCode) {
 			LOG_INFO(
 				"[Session:{}][Error:{}] I/O operation pending, no immediate "
 				"error",
+				session->GetHandle(), errorCode);
+			break;
+
+		case WSAEINVAL:
+			LOG_WARN(
+				"[Session:{}][Error:{}] Invalid argument, possible programming "
+				"error or resource exhaustion",
 				session->GetHandle(), errorCode);
 			break;
 
