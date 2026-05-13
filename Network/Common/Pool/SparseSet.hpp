@@ -33,6 +33,7 @@ class SparseSet {
 
 	[[nodiscard]] bool IsValid(uint64_t handle) const;
 	[[nodiscard]] uint64_t GetHandle(uint32_t who) const;
+	[[nodiscard]] size_t GetState(uint64_t handle) const;
 
    private:
 	bool MoveToStateInternal(uint64_t handle, size_t newState);
@@ -157,6 +158,16 @@ uint64_t SparseSet<N, stateCount>::GetHandle(uint32_t who) const {
 	// 상위 32비트는 generation, 하위 32비트는 who
 	return (static_cast<uint64_t>(sparse_[who].generation_) << kIndexShift) |
 		   who;
+}
+
+template <size_t N, size_t stateCount>
+size_t SparseSet<N, stateCount>::GetState(uint64_t handle) const {
+	if (!IsValid(handle)) {
+		LOG_ERROR("Invalid handle: {}", handle);
+		return static_cast<size_t>(-1);
+	}
+	auto who = static_cast<uint32_t>(handle);
+	return sparse_[who].state_;
 }
 
 template <size_t N, size_t stateCount>

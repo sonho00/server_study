@@ -51,7 +51,6 @@ class Session {
 	SessionManager* sessionManager_ = nullptr;
 	SOCKET socket_ = INVALID_SOCKET;
 	uint64_t handle_ = SparseSet<Config::kPoolSize>::kInvalidHandle;
-	SessionState state_ = SessionState::kIdle;
 	std::mutex mtx_;
 	bool isSending_ = false;
 

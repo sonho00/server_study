@@ -12,9 +12,7 @@
 #include "Session.hpp"
 
 SessionManager::SessionManager()
-	: sessionPool_([this](Session* session) {
-		  LOG_DEBUG("[Session:{}] Custom deleter called", session->handle_);
-		  LOG_DEBUG("this:{}", static_cast<void*>(this));
+	: sessionPool_([](Session* session) {
 		  session->handle_ = SparseSet<Config::kPoolSize>::kInvalidHandle;
 		  session->listener_->PostAccept();
 	  }) {}
@@ -37,7 +35,7 @@ SharedPoolPtr<Session> SessionManager::CreateSession() {
 	SharedPoolPtr<Session> sessionPtr =
 		sessionPool_.Acquire(static_cast<size_t>(SessionState::kIdle));
 	if (!sessionPtr.IsValid()) {
-		LOG_WARN("Failed to create session: No available handles");
+		LOG_WARN("Failed to acquire session from pool");
 		return nullptr;
 	}
 
@@ -56,10 +54,9 @@ bool SessionManager::ConnectSession(uint64_t handle) {
 		handle, static_cast<size_t>(SessionState::kConnected));
 }
 
-bool SessionManager::DisconnectSession(uint64_t handle) {
+void SessionManager::DisconnectSession(uint64_t handle) {
 	auto idx = static_cast<uint32_t>(handle);
 	sessionPtrs_[idx].Reset();
-	return SetState(handle, SessionState::kDisconnecting);
 }
 
 SharedPoolPtr<Session> SessionManager::GetSession(uint64_t handle) {
@@ -70,6 +67,11 @@ SharedPoolPtr<Session> SessionManager::GetSession(uint64_t handle) {
 
 	auto idx = static_cast<uint32_t>(handle);
 	return sessionPtrs_[idx];
+}
+
+SessionState SessionManager::GetState(uint64_t handle) {
+	return static_cast<SessionState>(
+		sessionPool_.GetState(handle));
 }
 
 bool SessionManager::SetState(uint64_t handle, SessionState newState) {

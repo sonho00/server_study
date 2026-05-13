@@ -180,23 +180,20 @@ bool Session::HandleIO(OverlappedEx& ovEx, DWORD bytesTransferred) {
 }
 
 bool Session::Disconnect() {
-	if (state_ == SessionState::kDisconnecting) {
+	std::lock_guard<std::mutex> lock(mtx_);
+	
+	if (sessionManager_->GetState(handle_) == SessionState::kDisconnecting) {
 		LOG_INFO("[Session:{}] Already disconnecting", handle_);
 		return true;
 	}
-
-	state_ = SessionState::kDisconnecting;
 	sessionManager_->SetState(handle_, SessionState::kDisconnecting);
-
-	std::lock_guard<std::mutex> lock(mtx_);
 
 	disconnectOv_.ioType_ = IO_TYPE::kDisconnect;
 	ZeroMemory(&disconnectOv_.overlapped_, sizeof(OVERLAPPED));
 	disconnectOv_.sessionPtr_ = sessionManager_->GetSession(handle_);
 
-	int result = ServerUtils::DisconnectEx(socket_, &disconnectOv_.overlapped_,
-										   TF_REUSE_SOCKET, 0);
-	if (result == SOCKET_ERROR) {
+	if (ServerUtils::DisconnectEx(socket_, &disconnectOv_.overlapped_,
+								  TF_REUSE_SOCKET, 0) == SOCKET_ERROR) {
 		ServerUtils::HandleError(disconnectOv_.sessionPtr_, WSAGetLastError());
 	}
 
@@ -209,6 +206,5 @@ bool Session::Clear() {
 	disconnectOv_.Reset();
 	isSending_ = false;
 	sessionManager_->DisconnectSession(handle_);
-	state_ = SessionState::kIdle;
 	return true;
 }

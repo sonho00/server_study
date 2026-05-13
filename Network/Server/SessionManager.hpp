@@ -19,9 +19,10 @@ class SessionManager {
 
 	SharedPoolPtr<Session> CreateSession();
 	bool ConnectSession(uint64_t handle);
-	bool DisconnectSession(uint64_t handle);
+	void DisconnectSession(uint64_t handle);
 
 	SharedPoolPtr<Session> GetSession(uint64_t handle);
+	SessionState GetState(uint64_t handle);
 	bool SetState(uint64_t handle, SessionState newState);
 
    private:
