@@ -181,13 +181,16 @@ bool Session::HandleIO(OverlappedEx& ovEx, DWORD bytesTransferred) {
 }
 
 bool Session::Disconnect() {
-	std::lock_guard<std::mutex> lock(mtx_);
+	{
+		std::lock_guard<std::mutex> lock(mtx_);
 
-	if (sessionManager_->GetState(handle_) == SessionState::kDisconnecting) {
-		LOG_INFO("[Session:{}] Already disconnecting", handle_);
-		return true;
+		if (sessionManager_->GetState(handle_) ==
+			SessionState::kDisconnecting) {
+			LOG_INFO("[Session:{}] Already disconnecting", handle_);
+			return true;
+		}
+		sessionManager_->SetState(handle_, SessionState::kDisconnecting);
 	}
-	sessionManager_->SetState(handle_, SessionState::kDisconnecting);
 
 	disconnectOv_.ioType_ = IO_TYPE::kDisconnect;
 	ZeroMemory(&disconnectOv_.overlapped_, sizeof(OVERLAPPED));
