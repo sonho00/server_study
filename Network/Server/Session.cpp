@@ -37,11 +37,23 @@ bool Session::RegisterRead() {
 	readOv_.sessionPtr_ = sessionManager_->GetSession(handle_);
 
 	DWORD flags = 0;
-	int recvResult = WSARecv(socket_, &readOv_.wsaBuf_, 1, nullptr, &flags,
+	int result = WSARecv(socket_, &readOv_.wsaBuf_, 1, nullptr, &flags,
 							 &readOv_.overlapped_, nullptr);
 
-	if (recvResult == SOCKET_ERROR) {
-		ServerUtils::HandleError(readOv_.sessionPtr_, WSAGetLastError());
+	if (result == SOCKET_ERROR) {
+		int errorCode = WSAGetLastError();
+		if (errorCode == WSA_IO_PENDING) return true;
+		readOv_.sessionPtr_.Reset();
+		switch (errorCode) {
+			case WSAECONNRESET:
+				LOG_INFO("[Session:{}] Connection closed by client", handle_);
+				return false;
+
+			default:
+				LOG_ERROR("[Session:{}][Error:{}] Failed to post read", handle_,
+						  errorCode);
+				return false;
+		}
 	}
 
 	return true;
@@ -57,13 +69,24 @@ bool Session::RegisterWrite() {
 	writeOv_.sessionPtr_ = sessionManager_->GetSession(handle_);
 
 	DWORD flags = 0;
-	int sendResult = WSASend(socket_, &writeOv_.wsaBuf_, 1, nullptr, flags,
+	int result = WSASend(socket_, &writeOv_.wsaBuf_, 1, nullptr, flags,
 							 &writeOv_.overlapped_, nullptr);
 
-	if (sendResult == SOCKET_ERROR) {
-		ServerUtils::HandleError(writeOv_.sessionPtr_, WSAGetLastError());
-	}
+	if (result == SOCKET_ERROR) {
+		int errorCode = WSAGetLastError();
+		if (errorCode == WSA_IO_PENDING) return true;
+		writeOv_.sessionPtr_.Reset();
+		switch (errorCode) {
+			case WSAECONNRESET:
+				LOG_INFO("[Session:{}] Connection closed by client", handle_);
+				return false;
 
+			default:
+				LOG_ERROR("[Session:{}][Error:{}] Failed to post write",
+						  handle_, errorCode);
+				return false;
+		}
+	}
 	return true;
 }
 
@@ -185,9 +208,20 @@ bool Session::Disconnect() {
 	ZeroMemory(&disconnectOv_.overlapped_, sizeof(OVERLAPPED));
 	disconnectOv_.sessionPtr_ = sessionManager_->GetSession(handle_);
 
-	if (ServerUtils::DisconnectEx(socket_, &disconnectOv_.overlapped_,
-								  TF_REUSE_SOCKET, 0) == SOCKET_ERROR) {
-		ServerUtils::HandleError(disconnectOv_.sessionPtr_, WSAGetLastError());
+	int result = ServerUtils::DisconnectEx(socket_, &disconnectOv_.overlapped_,
+										   TF_REUSE_SOCKET, 0);
+	if (result == SOCKET_ERROR) {
+		int errorCode = WSAGetLastError();
+		if (errorCode == WSA_IO_PENDING) return true;
+		LOG_ERROR("[Session:{}][Error:{}] Failed to post disconnect", handle_,
+				  errorCode);
+		switch (errorCode) {
+			default:
+				LOG_ERROR("[Session:{}][Error:{}] Failed to post disconnect",
+						  handle_, errorCode);
+				break;
+		}
+		return false;
 	}
 
 	return true;
