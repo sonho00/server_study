@@ -27,6 +27,7 @@ class SparsePool : public ISparsePool<T>, public SparseSet<N, StateCount> {
 
 	template <typename... Args>
 	SharedPoolPtr<T> Acquire(size_t state = 1, Args&&... args);
+	bool MoveToState(uint64_t handle, size_t newState);
 
 	[[nodiscard]] bool IsValid(uint64_t handle) const override;
 
@@ -61,6 +62,13 @@ SharedPoolPtr<T> SparsePool<T, N, StateCount, isLazy>::Acquire(size_t state,
 	}
 	slot->handle_ = handle;
 	return SharedPoolPtr<T>(this, handle);
+}
+
+template <typename T, size_t N, size_t StateCount, bool isLazy>
+bool SparsePool<T, N, StateCount, isLazy>::MoveToState(uint64_t handle,
+													   size_t newState) {
+	std::lock_guard lock(mutex_);
+	return SparseSet<N, StateCount>::MoveToState(handle, newState);
 }
 
 template <typename T, size_t N, size_t StateCount, bool isLazy>
