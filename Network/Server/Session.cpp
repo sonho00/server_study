@@ -37,7 +37,7 @@ bool Session::RegisterRead() {
 
 	DWORD flags = 0;
 	int result = WSARecv(socket_, &readOv_.wsaBuf_, 1, nullptr, &flags,
-							 &readOv_.overlapped_, nullptr);
+						 &readOv_.overlapped_, nullptr);
 
 	if (result == SOCKET_ERROR) {
 		int errorCode = WSAGetLastError();
@@ -54,7 +54,6 @@ bool Session::RegisterRead() {
 				return false;
 		}
 	}
-
 	return true;
 }
 
@@ -69,7 +68,7 @@ bool Session::RegisterWrite() {
 
 	DWORD flags = 0;
 	int result = WSASend(socket_, &writeOv_.wsaBuf_, 1, nullptr, flags,
-							 &writeOv_.overlapped_, nullptr);
+						 &writeOv_.overlapped_, nullptr);
 
 	if (result == SOCKET_ERROR) {
 		int errorCode = WSAGetLastError();
@@ -90,7 +89,7 @@ bool Session::RegisterWrite() {
 }
 
 bool Session::SendPacket(const PACKET_HEADER& header) {
-	std::lock_guard<std::mutex> lock(mtx_);
+	std::lock_guard<std::mutex> lock(writeMtx_);
 	if (writeOv_.writePos_ - writeOv_.readPos_ + header.size >
 		writeOv_.buffer_.GetSize()) {
 		LOG_WARN("[Session:{}] Write buffer overflow detected", handle_);
@@ -217,14 +216,31 @@ bool Session::Connect() {
 
 bool Session::Disconnect() {
 	{
-		std::lock_guard<std::mutex> lock(mtx_);
+		std::lock_guard<std::mutex> lock(connectMtx_);
+		switch (sessionManager_->GetState(handle_)) {
+			case SessionState::kPending:
+			case SessionState::kConnected:
+				if (!sessionManager_->SetState(handle_,
+											   SessionState::kDisconnecting)) {
+					LOG_ERROR(
+						"[Session:{}] Failed to transition to Disconnecting "
+						"state",
+						handle_);
+					return false;
+				}
+				break;
 
-		if (sessionManager_->GetState(handle_) ==
-			SessionState::kDisconnecting) {
-			LOG_INFO("[Session:{}] Already disconnecting", handle_);
-			return true;
+			case SessionState::kDisconnecting:
+				LOG_WARN("[Session:{}] Already in Disconnecting state",
+						 handle_);
+				return true;
+
+			default:
+				LOG_ERROR(
+					"[Session:{}] Invalid state for Disconnect: {}", handle_,
+					static_cast<uint8_t>(sessionManager_->GetState(handle_)));
+				return false;
 		}
-		sessionManager_->SetState(handle_, SessionState::kDisconnecting);
 	}
 
 	disconnectOv_.ioType_ = IO_TYPE::kDisconnect;
@@ -246,13 +262,11 @@ bool Session::Disconnect() {
 		}
 		return false;
 	}
-
 	return true;
 }
 
 bool Session::Clear() {
 	isSending_ = false;
 	sessionManager_->DisconnectSession(handle_);
-	handle_ = ISparsePool<Session>::kInvalidHandle;
 	return true;
 }
