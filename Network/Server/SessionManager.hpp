@@ -16,6 +16,7 @@ class SessionManager {
 	SessionManager();
 
 	bool Init(IocpCore& iocpCore, Listener& listener);
+	bool RegisterSession(uint64_t handle);
 
 	SharedPoolPtr<Session> CreateSession();
 	bool ConnectSession(uint64_t handle);
@@ -26,6 +27,7 @@ class SessionManager {
 	bool SetState(uint64_t handle, SessionState newState);
 
    private:
+	IocpCore* iocpCore_ = nullptr;
 	SparsePool<Session, Config::kPoolSize,
 			   static_cast<size_t>(SessionState::kCnt)>
 		sessionPool_;

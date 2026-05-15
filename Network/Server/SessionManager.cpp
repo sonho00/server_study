@@ -17,19 +17,29 @@ SessionManager::SessionManager()
 	  }) {}
 
 bool SessionManager::Init(IocpCore& iocpCore, Listener& listener) {
+	iocpCore_ = &iocpCore;
 	sessionPool_.SetPostReleaseFunc([&listener] { listener.PostAccept(); });
 
 	std::vector<uint64_t> handles = sessionPool_.GetIndicesInState(
 		static_cast<size_t>(SessionState::kIdle));
 
-	return std::ranges::all_of(handles, [this, &iocpCore](uint64_t handle) {
+	return std::ranges::all_of(handles, [this](uint64_t handle) {
 		Session* sessionPtr = sessionPool_.GetObj(handle);
-		if (!iocpCore.Register(sessionPtr->socket_, sessionPtr->GetHandle())) {
+		if (!iocpCore_->Register(sessionPtr->socket_, handle)) {
 			LOG_ERROR("Failed to register accept socket with IOCP");
 			return false;
 		}
 		return true;
 	});
+}
+
+bool SessionManager::RegisterSession(uint64_t handle) {
+	Session* sessionPtr = sessionPool_.GetObj(handle);
+	if (!iocpCore_->Register(sessionPtr->socket_, handle)) {
+		LOG_ERROR("Failed to register accept socket with IOCP");
+		return false;
+	}
+	return true;
 }
 
 SharedPoolPtr<Session> SessionManager::CreateSession() {
