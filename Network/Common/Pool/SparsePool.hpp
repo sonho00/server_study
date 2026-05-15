@@ -13,6 +13,8 @@
 
 template <typename T, size_t N, size_t StateCount = 2, bool isLazy = false>
 class SparsePool : public ISparsePool<T>, public SparseSet<N, StateCount> {
+	friend class SharedPoolPtr<T>;
+
 	using Slot = ISparsePool<T>::Slot;
 	using DeleteFunc = std::function<void(T*)>;
 	using PostReleaseFunc = std::function<void()>;
@@ -26,9 +28,6 @@ class SparsePool : public ISparsePool<T>, public SparseSet<N, StateCount> {
 	template <typename... Args>
 	SharedPoolPtr<T> Acquire(size_t state = 1, Args&&... args);
 
-	bool AddRef(uint64_t handle) override;
-	bool ReleaseRef(uint64_t handle) override;
-
 	[[nodiscard]] bool IsValid(uint64_t handle) const override;
 
 	[[nodiscard]] T* GetObj(uint64_t handle) override;
@@ -38,6 +37,9 @@ class SparsePool : public ISparsePool<T>, public SparseSet<N, StateCount> {
 	}
 
    private:
+	bool AddRef(uint64_t handle) override;
+	bool ReleaseRef(uint64_t handle) override;
+
 	ObjectPool<Slot, N, isLazy> pool_;
 	PostReleaseFunc postReleaseFunc_;
 	std::mutex mutex_;
@@ -59,6 +61,21 @@ SharedPoolPtr<T> SparsePool<T, N, StateCount, isLazy>::Acquire(size_t state,
 	}
 	slot->handle_ = handle;
 	return SharedPoolPtr<T>(this, handle);
+}
+
+template <typename T, size_t N, size_t StateCount, bool isLazy>
+bool SparsePool<T, N, StateCount, isLazy>::IsValid(uint64_t handle) const {
+	return SparseSet<N, StateCount>::IsValid(handle);
+}
+
+template <typename T, size_t N, size_t StateCount, bool isLazy>
+T* SparsePool<T, N, StateCount, isLazy>::GetObj(uint64_t handle) {
+	if (!IsValid(handle)) return nullptr;
+
+	auto idx = static_cast<uint32_t>(handle);
+	Slot* slot = pool_.Get(idx);
+
+	return &slot->obj_;
 }
 
 template <typename T, size_t N, size_t StateCount, bool isLazy>
@@ -91,19 +108,4 @@ bool SparsePool<T, N, StateCount, isLazy>::ReleaseRef(uint64_t handle) {
 	}
 
 	return false;
-}
-
-template <typename T, size_t N, size_t StateCount, bool isLazy>
-bool SparsePool<T, N, StateCount, isLazy>::IsValid(uint64_t handle) const {
-	return SparseSet<N, StateCount>::IsValid(handle);
-}
-
-template <typename T, size_t N, size_t StateCount, bool isLazy>
-T* SparsePool<T, N, StateCount, isLazy>::GetObj(uint64_t handle) {
-	if (!IsValid(handle)) return nullptr;
-
-	auto idx = static_cast<uint32_t>(handle);
-	Slot* slot = pool_.Get(idx);
-
-	return &slot->obj_;
 }
