@@ -4,7 +4,7 @@
 #include <vector>
 
 #include "Network/Common/Logger.hpp"
-#include "Tests/Client.hpp"
+#include "Tests/Base/Client.hpp"
 
 class ConnectionStress : public Client {
    public:

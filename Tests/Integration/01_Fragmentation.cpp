@@ -1,12 +1,11 @@
 #include <gtest/gtest.h>
 
-#include <cstdio>
 #include <cstring>
 #include <thread>
 
 #include "Network/Common/Logger.hpp"
 #include "Network/Common/Protocol.hpp"
-#include "Tests/Client.hpp"
+#include "Tests/Base/Client.hpp"
 
 class Fragmentation : public Client {
    public:
