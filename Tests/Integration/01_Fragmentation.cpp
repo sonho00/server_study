@@ -7,15 +7,11 @@
 #include "Network/Common/Protocol.hpp"
 #include "Tests/Base/Client.hpp"
 
-class Fragmentation : public Client {
+class FragmentationTest : public testing::Test, public Client {
    public:
-	Fragmentation() {
-		CreateSocket();
-		DefaultSockOpt();
-		Connect();
-	}
-
 	void ThreadFunc() {
+		Init();
+
 		auto* packet = reinterpret_cast<C2S_CHAT*>(sendBuf_.data());
 		packet->header.id = static_cast<uint16_t>(C2S_PACKET_ID::kChat);
 		packet->header.size = 404;
@@ -39,21 +35,15 @@ class Fragmentation : public Client {
 		}
 	}
 
-	bool test() {
-		sendBuf_.fill(0);
-		recvBuf_.fill(0);
-		success_ = true;
-		std::thread clientThread(&Fragmentation::ThreadFunc, this);
-		clientThread.join();
-		return success_ && memcmp(sendBuf_.data(), recvBuf_.data(), 404) == 0;
-	}
-
-   private:
-	std::array<char, 500> sendBuf_;
-	std::array<char, 500> recvBuf_;
+   protected:
+	std::array<char, 500> sendBuf_{};
+	std::array<char, 500> recvBuf_{};
 };
 
-TEST(NetworkTest, Fragmentation) {
-	Fragmentation client;
-	EXPECT_TRUE(client.test());
+TEST_F(FragmentationTest, VerifyDataIntegrity) {
+	std::thread clientThread(&FragmentationTest::ThreadFunc, this);
+	clientThread.join();
+
+	EXPECT_TRUE(success_);
+	EXPECT_EQ(memcmp(sendBuf_.data(), recvBuf_.data(), 404), 0);
 }
