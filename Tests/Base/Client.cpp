@@ -12,11 +12,47 @@ Client::~Client() {
 	}
 }
 
+int Client::Init() {
+	CreateSocket();
+	DefaultSockOpt();
+	AdditionalSockOpt();
+	return Connect();
+}
+
 void Client::CreateSocket() {
 	socket_ = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 	if (socket_ == INVALID_SOCKET) {
 		LOG_FATAL("Failed to create socket: {}", WSAGetLastError());
 	}
+}
+
+void Client::DefaultSockOpt() {
+	int opt = 1;
+	if (setsockopt(socket_, SOL_SOCKET, SO_REUSEADDR, (const char*)&opt,
+				   sizeof(opt)) == SOCKET_ERROR) {
+		LOG_ERROR("setsockopt(SO_REUSEADDR) failed: {}", WSAGetLastError());
+	}
+
+	int tcp_opt = 1;
+	if (setsockopt(socket_, IPPROTO_TCP, TCP_NODELAY, (const char*)&tcp_opt,
+				   sizeof(tcp_opt)) == SOCKET_ERROR) {
+		LOG_ERROR("setsockopt TCP_NODELAY failed: {}", WSAGetLastError());
+	}
+}
+
+int Client::Connect() {
+	sockaddr_in serverAddr{};
+	serverAddr.sin_family = AF_INET;
+	InetPton(AF_INET, kIpAddr_, &serverAddr.sin_addr);
+	serverAddr.sin_port = htons(kPort_);
+	if (connect(socket_, (sockaddr*)&serverAddr, sizeof(serverAddr)) ==
+		SOCKET_ERROR) {
+		int errorCode = WSAGetLastError();
+		LOG_ERROR("Failed to connect to server: {}", errorCode);
+		closesocket(socket_);
+		return errorCode;
+	}
+	return 0;
 }
 
 bool Client::SendByte(char* buffer, int len) const {
@@ -92,33 +128,4 @@ bool Client::HandlePacket(const PACKET_HEADER& header) {
 	}
 
 	return true;
-}
-
-void Client::DefaultSockOpt() {
-	int opt = 1;
-	if (setsockopt(socket_, SOL_SOCKET, SO_REUSEADDR, (const char*)&opt,
-				   sizeof(opt)) == SOCKET_ERROR) {
-		LOG_ERROR("setsockopt(SO_REUSEADDR) failed: {}", WSAGetLastError());
-	}
-
-	int tcp_opt = 1;
-	if (setsockopt(socket_, IPPROTO_TCP, TCP_NODELAY, (const char*)&tcp_opt,
-				   sizeof(tcp_opt)) == SOCKET_ERROR) {
-		LOG_ERROR("setsockopt TCP_NODELAY failed: {}", WSAGetLastError());
-	}
-}
-
-int Client::Connect() {
-	sockaddr_in serverAddr{};
-	serverAddr.sin_family = AF_INET;
-	InetPton(AF_INET, kIpAddr_, &serverAddr.sin_addr);
-	serverAddr.sin_port = htons(kPort_);
-	if (connect(socket_, (sockaddr*)&serverAddr, sizeof(serverAddr)) ==
-		SOCKET_ERROR) {
-		int errorCode = WSAGetLastError();
-		LOG_ERROR("Failed to connect to server: {}", errorCode);
-		closesocket(socket_);
-		return errorCode;
-	}
-	return 0;
 }

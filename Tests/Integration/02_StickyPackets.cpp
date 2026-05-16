@@ -7,15 +7,11 @@
 #include "Network/Common/Protocol.hpp"
 #include "Tests/Base/Client.hpp"
 
-class StickyPackets : public Client {
+class StickyPacketsTest : public testing::Test, public Client {
    public:
-	StickyPackets() {
-		CreateSocket();
-		DefaultSockOpt();
-		Connect();
-	}
-
-	void ThreadFunc() override {
+	void ThreadFunc() {
+		Init();
+		
 		reinterpret_cast<PACKET_HEADER*>(sendBuf_.data())->size = 25004;
 		reinterpret_cast<PACKET_HEADER*>(sendBuf_.data())->id =
 			static_cast<uint16_t>(C2S_PACKET_ID::kChat);
@@ -41,21 +37,15 @@ class StickyPackets : public Client {
 		}
 	}
 
-	bool test() override {
-		sendBuf_.fill(0);
-		recvBuf_.fill(0);
-		success_ = true;
-		std::thread clientThread(&StickyPackets::ThreadFunc, this);
-		clientThread.join();
-		return success_ && memcmp(sendBuf_.data(), recvBuf_.data(), 75012) == 0;
-	}
-
-   private:
-	std::array<char, 76000> sendBuf_;
-	std::array<char, 76000> recvBuf_;
+   protected:
+	std::array<char, 76000> sendBuf_{};
+	std::array<char, 76000> recvBuf_{};
 };
 
-TEST(NetworkTest, StickyPackets) {
-	StickyPackets client;
-	EXPECT_TRUE(client.test());
+TEST_F(StickyPacketsTest, VerifyDataIntegrity) {
+	std::thread clientThread(&StickyPacketsTest::ThreadFunc, this);
+	clientThread.join();
+
+	EXPECT_TRUE(success_);
+	EXPECT_EQ(memcmp(sendBuf_.data(), recvBuf_.data(), 75012), 0);
 }
