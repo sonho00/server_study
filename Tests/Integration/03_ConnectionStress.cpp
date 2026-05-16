@@ -8,7 +8,7 @@
 
 class ConnectionStress : public Client {
    public:
-	void ThreadFunc() override {
+	void ThreadFunc() {
 		// 1000개의 클라이언트가 접속, 종료
 		for (int i = 0; i < 1000; ++i) {
 			ConnectionStress client;
@@ -38,7 +38,7 @@ class ConnectionStress : public Client {
 		}
 	}
 
-	bool test() override {
+	bool test()  {
 		std::vector<std::thread> clientThreads;
 		clientThreads.reserve(100);
 		for (int i = 0; i < 100; ++i) {

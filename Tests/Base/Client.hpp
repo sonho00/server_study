@@ -24,9 +24,6 @@ class Client {
 
 	static bool HandlePacket(const PACKET_HEADER& header);
 
-	virtual void ThreadFunc() = 0;
-	virtual bool test() = 0;
-
 	bool success_ = true;
 
 	static constexpr const char* kIpAddr_ = "127.0.0.1";

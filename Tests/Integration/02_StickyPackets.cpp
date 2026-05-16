@@ -15,7 +15,7 @@ class StickyPackets : public Client {
 		Connect();
 	}
 
-	void ThreadFunc() override {
+	void ThreadFunc() {
 		reinterpret_cast<PACKET_HEADER*>(sendBuf_.data())->size = 25004;
 		reinterpret_cast<PACKET_HEADER*>(sendBuf_.data())->id =
 			static_cast<uint16_t>(C2S_PACKET_ID::kChat);
@@ -41,7 +41,7 @@ class StickyPackets : public Client {
 		}
 	}
 
-	bool test() override {
+	bool test() {
 		sendBuf_.fill(0);
 		recvBuf_.fill(0);
 		success_ = true;

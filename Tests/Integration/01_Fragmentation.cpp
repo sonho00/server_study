@@ -15,7 +15,7 @@ class Fragmentation : public Client {
 		Connect();
 	}
 
-	void ThreadFunc() override {
+	void ThreadFunc() {
 		auto* packet = reinterpret_cast<C2S_CHAT*>(sendBuf_.data());
 		packet->header.id = static_cast<uint16_t>(C2S_PACKET_ID::kChat);
 		packet->header.size = 404;
@@ -39,7 +39,7 @@ class Fragmentation : public Client {
 		}
 	}
 
-	bool test() override {
+	bool test() {
 		sendBuf_.fill(0);
 		recvBuf_.fill(0);
 		success_ = true;
