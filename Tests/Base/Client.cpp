@@ -64,7 +64,6 @@ void Client::ReceiveWelcomePacket() {
 	S2C_CHAT welcomePacket{};
 	if (!ReceivePacket(reinterpret_cast<char*>(&welcomePacket))) {
 		LOG_ERROR("Failed to receive welcome packet from server.");
-		success_ = false;
 		return;
 	}
 
