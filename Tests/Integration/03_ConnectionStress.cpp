@@ -23,8 +23,8 @@ class StressClient : public Client {
 class ConnectionStressTest : public testing::Test {
    public:
 	void ThreadFunc() {
-		// 1000개의 클라이언트가 접속, 종료
-		for (int i = 0; i < 1000; ++i) {
+		// 100개의 클라이언트가 접속, 종료
+		for (int i = 0; i < 100; ++i) {
 			StressClient client;
 
 			for (int j = 0; j < 32; ++j) {

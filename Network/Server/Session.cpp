@@ -206,6 +206,17 @@ bool Session::Connect() {
 		}
 	}
 
+	S2C_CHAT welcomePacket{};
+	welcomePacket.header.id = static_cast<uint16_t>(S2C_PACKET_ID::kChat);
+	sprintf(welcomePacket.message, "%lld", handle_);
+	welcomePacket.header.size =
+		sizeof(welcomePacket.header) + strlen(welcomePacket.message) + 1;
+
+	if (!SendPacket(welcomePacket.header)) {
+		LOG_ERROR("[Session:{}] Failed to send welcome packet", handle_);
+		return false;
+	}
+
 	if (!RegisterRead()) {
 		LOG_WARN("[Session:{}] Failed to post initial read", handle_);
 		return false;

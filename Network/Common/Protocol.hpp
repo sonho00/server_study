@@ -31,9 +31,9 @@ struct C2S_MOVE {
 
 struct S2C_MOVE {
 	PACKET_HEADER header;
+	uint64_t sessionHandle;
 	float x;
 	float y;
-	uint16_t sessionId;
 };
 
 struct C2S_CHAT {
@@ -43,8 +43,8 @@ struct C2S_CHAT {
 
 struct S2C_CHAT {
 	PACKET_HEADER header;
+	uint64_t sessionHandle;
 	char message[Config::kChatPacketSize];
-	uint16_t sessionId;
 };
 
 #pragma pack(pop)

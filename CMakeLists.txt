@@ -18,6 +18,11 @@ FetchContent_MakeAvailable(googletest)
 
 if(MSVC)
     add_compile_options(/W4)
+    add_compile_options(/fsanitize=address)
+    add_link_options(/fsanitize=address)
+
+    # 디버그 정보(PDB)가 온전하게 남도록 증분 링크 비활성화 (ASan 필수 권장사항)
+    add_link_options(/INCREMENTAL:NO)
 else()
     add_compile_options(-Wall -Wextra)
 endif()

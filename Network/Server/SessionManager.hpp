@@ -6,6 +6,7 @@
 #include "Network/Common/Config.hpp"
 #include "Network/Common/Pool/SharedPoolPtr.hpp"
 #include "Network/Common/Pool/SparsePool.hpp"
+#include "Network/Common/Protocol.hpp"
 #include "Session.hpp"
 
 class IocpCore;
@@ -21,6 +22,8 @@ class SessionManager {
 	SharedPoolPtr<Session> CreateSession();
 	bool ConnectSession(uint64_t handle);
 	void DisconnectSession(uint64_t handle);
+
+	bool Broadcast(const PACKET_HEADER& header, uint64_t sessionHandle);
 
 	SharedPoolPtr<Session> GetSession(uint64_t handle);
 	SessionState GetState(uint64_t handle);

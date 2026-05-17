@@ -2,6 +2,8 @@
 
 #include <WinSock2.h>
 
+#include <cstdint>
+
 #include "Network/Common/Protocol.hpp"
 #include "Network/Common/WSAManager.hpp"
 
@@ -15,6 +17,7 @@ class Client {
 	void DefaultSockOpt();
 	virtual void AdditionalSockOpt() {}
 	virtual int Connect();
+	void ReceiveWelcomePacket();
 
 	[[nodiscard]] bool SendPacket(const PACKET_HEADER& header) const;
 	[[nodiscard]] PACKET_HEADER* ReceivePacket(char* buffer);
@@ -24,14 +27,12 @@ class Client {
 
 	static bool HandlePacket(const PACKET_HEADER& header);
 
-	bool success_ = true;
-
 	static constexpr const char* kIpAddr_ = "127.0.0.1";
 	static constexpr uint16_t kPort_ = 12345;
 
+	SOCKET socket_;
+	uint64_t sessionHandle_;
+
    private:
 	WSAManager wsaManager_;
-
-   protected:
-	SOCKET socket_;
 };

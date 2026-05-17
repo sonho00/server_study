@@ -16,7 +16,12 @@ int Client::Init() {
 	CreateSocket();
 	DefaultSockOpt();
 	AdditionalSockOpt();
-	return Connect();
+	int result = Connect();
+	if (result != 0) {
+		return result;
+	}
+	ReceiveWelcomePacket();
+	return 0;
 }
 
 void Client::CreateSocket() {
@@ -53,6 +58,16 @@ int Client::Connect() {
 		return errorCode;
 	}
 	return 0;
+}
+
+void Client::ReceiveWelcomePacket() {
+	S2C_CHAT welcomePacket{};
+	if (!ReceivePacket(reinterpret_cast<char*>(&welcomePacket))) {
+		LOG_ERROR("Failed to receive welcome packet from server.");
+		return;
+	}
+
+	sessionHandle_ = welcomePacket.sessionHandle;
 }
 
 bool Client::SendByte(char* buffer, int len) const {

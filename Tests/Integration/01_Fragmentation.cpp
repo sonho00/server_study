@@ -1,49 +1,35 @@
 #include <gtest/gtest.h>
 
-#include <cstring>
-#include <thread>
-
-#include "Network/Common/Logger.hpp"
 #include "Network/Common/Protocol.hpp"
 #include "Tests/Base/Client.hpp"
 
-class FragmentationTest : public testing::Test, public Client {
-   public:
-	void ThreadFunc() {
-		Init();
+TEST(FragmentationTest, HandleFragmentedPacket) {
+	Client client1, client2;
+	client1.Init();
+	client2.Init();
 
-		auto* packet = reinterpret_cast<C2S_CHAT*>(sendBuf_.data());
-		packet->header.id = static_cast<uint16_t>(C2S_PACKET_ID::kChat);
-		packet->header.size = 404;
+	std::array<char, 404> sendBuf{};
+	std::array<char, 404> recvBuf{};
+	auto* sendHeader = reinterpret_cast<PACKET_HEADER*>(sendBuf.data());
 
-		for (int i = 0; i < 100; ++i) {
-			sprintf_s(packet->message + i * 4, 5, "%03d ", i);
-		}
+	sendHeader->id = static_cast<uint16_t>(C2S_PACKET_ID::kChat);
+	sendHeader->size = 404;
 
-		for (int i = 0; i < 404; ++i) {
-			if (!SendByte(sendBuf_.data() + i, 1)) {
-				success_ = false;
-				LOG_ERROR("Failed to send data: {}", WSAGetLastError());
-				return;
-			}
-		}
-
-		if (!ReceiveByte(recvBuf_.data(), packet->header.size)) {
-			success_ = false;
-			LOG_ERROR("Failed to receive data: {}", WSAGetLastError());
-			return;
-		}
+	for (int i = 0; i < 100; ++i) {
+		sprintf_s(sendBuf.data() + sizeof(PACKET_HEADER) + i * 4, 5, "%03d ",
+				  i);
 	}
 
-   protected:
-	std::array<char, 500> sendBuf_{};
-	std::array<char, 500> recvBuf_{};
-};
+	for (int i = 0; i < 404; ++i) {
+		EXPECT_TRUE(client1.SendByte(sendBuf.data() + i, 1));
+	}
 
-TEST_F(FragmentationTest, VerifyDataIntegrity) {
-	std::thread clientThread(&FragmentationTest::ThreadFunc, this);
-	clientThread.join();
+	S2C_CHAT recvPacket;
+	EXPECT_TRUE(client2.ReceivePacket(reinterpret_cast<char*>(&recvPacket)));
 
-	EXPECT_TRUE(success_);
-	EXPECT_EQ(memcmp(sendBuf_.data(), recvBuf_.data(), 404), 0);
+	EXPECT_EQ(recvPacket.header.id,
+			  static_cast<uint16_t>(S2C_PACKET_ID::kChat));
+	EXPECT_EQ(recvPacket.header.size,
+			  sendHeader->size + sizeof(recvPacket.sessionHandle));
+	EXPECT_STREQ(recvPacket.message, sendBuf.data() + sizeof(PACKET_HEADER));
 }
