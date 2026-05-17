@@ -72,6 +72,23 @@ void SessionManager::DisconnectSession(uint64_t handle) {
 	sessionPtrs_[idx].Reset();
 }
 
+bool SessionManager::Broadcast(const PACKET_HEADER& header,
+							   uint64_t sessionHandle) {
+	std::vector<uint64_t> handles = sessionPool_.GetIndicesInState(
+		static_cast<size_t>(SessionState::kConnected));
+
+	for (uint64_t handle : handles) {
+		if (handle == sessionHandle) {
+			continue;
+		}
+		auto idx = static_cast<uint32_t>(handle);
+		if (sessionPtrs_[idx].IsValid()) {
+			sessionPtrs_[idx]->SendPacket(header);
+		}
+	}
+	return true;
+}
+
 SharedPoolPtr<Session> SessionManager::GetSession(uint64_t handle) {
 	if (!sessionPool_.IsValid(handle)) {
 		LOG_ERROR("Invalid session handle: {}", handle);
