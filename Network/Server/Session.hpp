@@ -34,8 +34,11 @@ class Session {
 	bool Disconnect();
 	bool Clear();
 
-	[[nodiscard]] uint64_t GetHandle() const { return handle_; }
 	[[nodiscard]] SOCKET GetSocket() const { return socket_; }
+	[[nodiscard]] uint64_t GetHandle() const { return handle_; }
+	[[nodiscard]] SessionManager* GetSessionManager() const {
+		return sessionManager_;
+	}
 	[[nodiscard]] Listener* GetListener() const { return listener_; }
 	void SetListener(Listener* listener) { listener_ = listener; }
 
@@ -49,11 +52,12 @@ class Session {
 	bool OnRead(DWORD bytesTransferred);
 	bool OnWrite(DWORD bytesTransferred);
 
-	Listener* listener_ = nullptr;
-	SessionManager* sessionManager_ = nullptr;
-
 	SOCKET socket_ = INVALID_SOCKET;
 	uint64_t handle_ = SparseSet<Config::kPoolSize>::kInvalidHandle;
+
+	SessionManager* sessionManager_ = nullptr;
+	Listener* listener_ = nullptr;
+
 	bool isSending_ = false;
 
 	std::mutex writeMtx_;
