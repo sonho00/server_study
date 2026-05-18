@@ -13,6 +13,8 @@
 
 SessionManager::SessionManager()
 	: sessionPool_([](Session* sessionPtr) {
+		  sessionPtr->readOv_.Reset();
+		  sessionPtr->writeOv_.Reset();
 		  sessionPtr->handle_ = ISparsePool<Session>::kInvalidHandle;
 	  }) {}
 
