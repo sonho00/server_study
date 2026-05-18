@@ -71,7 +71,6 @@ void Client::ReceiveWelcomePacket() {
 }
 
 bool Client::SendByte(char* buffer, int len) const {
-	LOG_DEBUG("Attempting to send {} bytes to server", len);
 	int bytesSent = 0;
 	while (bytesSent < len) {
 		int result = send(socket_, buffer + bytesSent, len - bytesSent, 0);
