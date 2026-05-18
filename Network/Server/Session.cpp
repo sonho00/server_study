@@ -122,7 +122,8 @@ bool Session::OnRead(DWORD bytesTransferred) {
 		auto* header = reinterpret_cast<PACKET_HEADER*>(
 			readOv_.buffer_.GetBuffer() + readOv_.readPos_);
 
-		if (header->size == 0 || header->size > readOv_.buffer_.GetSize()) {
+		if (header->size < sizeof(PACKET_HEADER) ||
+			header->size >= readOv_.buffer_.GetSize()) {
 			LOG_ERROR("[Session:{}] Invalid packet size: {}", handle_,
 					  header->size);
 			return false;
