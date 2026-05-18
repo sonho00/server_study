@@ -33,11 +33,9 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 file(GLOB_RECURSE COMMON_SRC "Network/Common/*.cpp")
 file(GLOB_RECURSE SERVER_ONLY_SRC "Network/Server/*.cpp")
-file(GLOB_RECURSE CLIENT_ONLY_SRC "Network/Client/*.cpp")
 file(GLOB_RECURSE TEST_SRC "Tests/*.cpp")
 
 add_executable(server ${SERVER_ONLY_SRC} ${COMMON_SRC})
-add_executable(client ${CLIENT_ONLY_SRC} ${COMMON_SRC})
 add_executable(tests ${TEST_SRC} ${COMMON_SRC})
 
 if(MSVC)
@@ -50,7 +48,6 @@ endif()
 
 if(WIN32)
     target_link_libraries(server PRIVATE ws2_32)
-    target_link_libraries(client PRIVATE ws2_32)
     target_link_libraries(tests PRIVATE ws2_32 gtest_main)
 endif()
 
@@ -60,14 +57,6 @@ add_custom_target(run-server
     DEPENDS server
     WORKING_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
     COMMENT "Building and Running Server..."
-)
-
-# 클라이언트 실행 타겟
-add_custom_target(run-client
-    COMMAND client
-    DEPENDS client
-    WORKING_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
-    COMMENT "Building and Running Client..."
 )
 
 # 테스트 실행 타겟
