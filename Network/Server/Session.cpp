@@ -2,6 +2,7 @@
 
 #include <WinSock2.h>
 
+#include <cassert>
 #include <cstring>
 #include <mutex>
 
@@ -58,8 +59,8 @@ bool Session::RegisterRead() {
 }
 
 bool Session::RegisterWrite() {
-	// 이 함수는 mtx 락을 획득한 상태이고 isSending_가 true인 상태에서만
-	// 호출되어야 합니다.
+	assert(isSending_);
+
 	writeOv_.ioType_ = IO_TYPE::kSend;
 	writeOv_.wsaBuf_.buf = writeOv_.buffer_.GetBuffer() + writeOv_.readPos_;
 	writeOv_.wsaBuf_.len = writeOv_.writePos_ - writeOv_.readPos_;
@@ -157,8 +158,9 @@ bool Session::OnRead(DWORD bytesTransferred) {
 }
 
 bool Session::OnWrite(DWORD bytesTransferred) {
-	// 이 함수가 호출될 때는 is sending_가 true인 상태입니다.
 	std::lock_guard<std::mutex> lock(writeMtx_);
+	assert(isSending_);
+	
 	writeOv_.readPos_ += bytesTransferred;
 
 	if (writeOv_.readPos_ >= writeOv_.buffer_.GetSize()) {
