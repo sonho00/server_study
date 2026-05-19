@@ -278,7 +278,6 @@ bool Session::Disconnect() {
 }
 
 bool Session::Clear() {
-	isSending_ = false;
 	sessionManager_->DisconnectSession(handle_);
 	return true;
 }
