@@ -47,7 +47,7 @@ class Session {
 	OverlappedEx disconnectOv_;
 
    private:
-	bool RegisterWrite();
+	bool RegisterWriteInternal();
 
 	bool OnRead(DWORD bytesTransferred);
 	bool OnWrite(DWORD bytesTransferred);
